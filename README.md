@@ -64,13 +64,108 @@ src/
 ├─ state/    état de l'application, scénarios, valeurs par défaut
 ├─ storage/  sauvegarde locale (Capacitor Preferences)
 ├─ screens/  écrans de l'application
-└─ components/  champs de saisie, graphiques (Recharts)
+├─ components/  champs de saisie, graphiques (Recharts)
+└─ export/   CSV, résumé PDF, partage
+android/     projet Android (Capacitor)
+assets/      icône et écran de démarrage (sources)
 ```
 
 ## Application Android
 
-_Section complétée lors de l'intégration Capacitor : génération du keystore, secrets
-GitHub à créer, publication d'une version via un tag `v*` et installation de l'APK._
+L'application Android est construite avec [Capacitor](https://capacitorjs.com/) à partir de la version web.
+
+### Installer l'APK
+
+1. Ouvrez la page **Releases** du dépôt depuis votre téléphone et téléchargez le fichier `simupret-x.y.z.apk`.
+2. Ouvrez le fichier. Android demande d'autoriser l'installation depuis cette source (navigateur ou
+   gestionnaire de fichiers) : acceptez pour cette application uniquement.
+3. Lancez « Simulateur de crédit ». Les données restent sur le téléphone.
+
+Un APK nommé `…-debug.apk` est une version de test non signée avec la clé de publication : une version
+signée ultérieure ne pourra pas la mettre à jour, il faudra d'abord la désinstaller.
+
+### Publier une version
+
+Chaque tag `v*` déclenche le workflow **APK Android**, qui construit l'APK et l'attache à une GitHub Release :
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+Utilisez un numéro `MAJEUR.MINEUR.CORRECTIF` : le `versionCode` Android est calculé ainsi
+(`1.2.3` → `10203`) et doit augmenter à chaque version. Le workflow peut aussi être lancé à la main
+(onglet **Actions** → **APK Android** → **Run workflow**) : l'APK est alors disponible comme artefact,
+sans release.
+
+### Signature de l'APK
+
+Sans secrets de signature, le workflow produit un APK **debug** (installable, mais non destiné à la
+publication). Pour un APK release signé :
+
+1. Générez une fois un keystore (gardez-le précieusement, hors du dépôt : il sera nécessaire pour
+   toutes les mises à jour) :
+
+   ```bash
+   keytool -genkeypair -v \
+     -keystore simupret-release.keystore \
+     -alias simupret \
+     -keyalg RSA -keysize 4096 -validity 10000 \
+     -dname "CN=Simupret, C=BE"
+   ```
+
+   `keytool` est fourni avec Java (JDK). Il demande le mot de passe du keystore puis celui de la clé.
+
+2. Encodez-le en base64 :
+
+   ```bash
+   base64 -w 0 simupret-release.keystore > keystore.b64   # Linux
+   base64 -i simupret-release.keystore -o keystore.b64    # macOS
+   ```
+
+3. Dans GitHub : **Settings** → **Secrets and variables** → **Actions** → **New repository secret**,
+   créez ces quatre secrets :
+
+   | Secret | Valeur |
+   | --- | --- |
+   | `ANDROID_KEYSTORE_BASE64` | contenu du fichier `keystore.b64` |
+   | `ANDROID_KEYSTORE_PASSWORD` | mot de passe du keystore |
+   | `ANDROID_KEY_ALIAS` | alias de la clé (`simupret` dans l'exemple) |
+   | `ANDROID_KEY_PASSWORD` | mot de passe de la clé |
+
+   Avec la commande `gh` :
+
+   ```bash
+   gh secret set ANDROID_KEYSTORE_BASE64 < keystore.b64
+   gh secret set ANDROID_KEYSTORE_PASSWORD
+   gh secret set ANDROID_KEY_ALIAS --body simupret
+   gh secret set ANDROID_KEY_PASSWORD
+   ```
+
+Supprimez ensuite `keystore.b64`.
+
+### Construire l'APK en local
+
+Prérequis : JDK 21 et Android SDK (Android Studio).
+
+```bash
+npm run android:sync   # build web + copie dans le projet Android
+cd android && ./gradlew assembleDebug
+# APK : android/app/build/outputs/apk/debug/app-debug.apk
+```
+
+Ou `npm run android:open` pour ouvrir le projet dans Android Studio.
+
+## Version web (GitHub Pages)
+
+Le workflow **GitHub Pages** publie la version web à chaque push sur `main` (ou à la demande depuis
+l'onglet Actions). À activer une fois : **Settings** → **Pages** → **Source** : **GitHub Actions**.
+L'application est alors disponible sur `https://<utilisateur>.github.io/<dépôt>/`.
+
+## Intégration continue
+
+À chaque push et pull request : lint (ESLint), vérification des types (TypeScript strict), tests
+(Vitest) et build web.
 
 ## Licence
 
