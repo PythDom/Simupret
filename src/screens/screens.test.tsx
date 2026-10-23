@@ -30,6 +30,7 @@ describe('Paramètres', () => {
     renderWithStore(<Parametres />);
     expect(screen.getByText('valeurs indicatives')).toBeInTheDocument();
     expect(screen.getByLabelText('Taux 20 ans, quotité 80–90 %')).toHaveValue('3,67');
+    expect(screen.getByLabelText('Taux 15 ans, quotité 80–90 %')).toHaveValue('3,55');
   });
 });
 

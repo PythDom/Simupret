@@ -82,16 +82,16 @@ export default function Parametres() {
 
       <Card title={<span className="flex items-center gap-2">Grille de taux fixes <IndicativeBadge /></span>}>
         <p className="text-sm text-slate-600 dark:text-slate-400">
-          Taux annuels par durée et par quotité (octobre 2026). Touchez × si une durée n&apos;est pas proposée.
+          Taux annuels en %, par durée et par quotité (octobre 2026). Touchez × si une durée n&apos;est pas proposée.
         </p>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[30rem] text-sm">
+          <table className="w-full min-w-[34rem] text-sm">
             <thead>
               <tr className="text-left text-slate-500 dark:text-slate-400">
                 <th className="py-2 pr-2 font-medium">Quotité</th>
                 {GRID_DURATIONS_YEARS.map((y) => (
                   <th key={y} className="px-1 py-2 font-medium">
-                    {y} ans
+                    {y} ans (%)
                   </th>
                 ))}
               </tr>
@@ -203,7 +203,7 @@ function GridCell({ label, value, onChange }: { label: string; value: number | n
   return (
     <div className="flex items-start gap-1">
       <div className="min-w-0 flex-1">
-        <PercentField label={label} hideLabel value={value} min={0} max={30} onChange={(v) => onChange(v)} />
+        <NumberField label={label} hideLabel scale={100} decimals={3} value={value} min={0} max={30} onChange={(v) => onChange(v)} />
       </div>
       <button
         type="button"
