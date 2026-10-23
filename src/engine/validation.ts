@@ -1,4 +1,4 @@
-import type { Tranche, ValidationError } from './types';
+import type { SimulationInput, Tranche, ValidationError } from './types';
 
 /** Durée maximale acceptée pour une tranche (40 ans). */
 export const MAX_DURATION_MONTHS = 480;
@@ -50,5 +50,76 @@ export function validateTranches(tranches: readonly Tranche[]): ValidationError[
     }
     ids.add(t.id);
   });
+  return errors;
+}
+
+function positive(x: number): boolean {
+  return isFiniteNumber(x) && x > 0;
+}
+
+function positiveInt(x: number): boolean {
+  return Number.isInteger(x) && x >= 1;
+}
+
+/** Valide les remboursements anticipés, l'indemnité et le refinancement d'un scénario. */
+export function validateSimulationInput(input: SimulationInput): ValidationError[] {
+  const errors = validateTranches(input.tranches);
+  const ids = new Set(input.tranches.map((t) => t.id));
+
+  (input.prepayments ?? []).forEach((p, i) => {
+    const path = `prepayments[${i}]`;
+    const err = (field: string, message: string) => errors.push({ field: `${path}.${field}`, message });
+    if (p.trancheId !== undefined && !ids.has(p.trancheId) && p.trancheId !== input.refinancing?.trancheId) {
+      err('trancheId', "La tranche choisie pour le remboursement anticipé n'existe pas.");
+    }
+    if (p.kind === 'oneOff') {
+      if (!positiveInt(p.month)) err('month', 'Le mois du remboursement anticipé doit être un entier supérieur ou égal à 1.');
+      if (!positive(p.amount)) err('amount', 'Le montant du remboursement anticipé doit être strictement positif.');
+      return;
+    }
+    if (!positiveInt(p.everyMonths)) err('everyMonths', 'La périodicité doit être un nombre entier de mois, au moins 1.');
+    if (p.startMonth !== undefined && !positiveInt(p.startMonth)) {
+      err('startMonth', 'Le mois de début doit être un entier supérieur ou égal à 1.');
+    }
+    if (p.endMonth !== undefined && (!positiveInt(p.endMonth) || p.endMonth < (p.startMonth ?? 1))) {
+      err('endMonth', 'Le mois de fin doit être postérieur au mois de début.');
+    }
+    if (p.amount.type === 'fixed' && !positive(p.amount.amount)) {
+      err('amount', 'Le montant du remboursement récurrent doit être strictement positif.');
+    }
+    if (p.amount.type === 'budget' && !positive(p.amount.monthlyBudget)) {
+      err('amount', 'Le budget mensuel doit être strictement positif.');
+    }
+  });
+
+  const pen = input.penalty;
+  if (pen) {
+    if (!isFiniteNumber(pen.monthsOfInterest) || pen.monthsOfInterest < 0 || pen.monthsOfInterest > 12) {
+      errors.push({ field: 'penalty.monthsOfInterest', message: "L'indemnité doit être comprise entre 0 et 12 mois d'intérêts." });
+    }
+    const a = pen.allowance;
+    if (a.kind === 'percentOfInitial' && (!isFiniteNumber(a.fraction) || a.fraction < 0 || a.fraction > 1)) {
+      errors.push({ field: 'penalty.allowance', message: 'La franchise doit être comprise entre 0 % et 100 % du capital.' });
+    }
+    if (a.kind === 'fixed' && (!isFiniteNumber(a.amount) || a.amount < 0)) {
+      errors.push({ field: 'penalty.allowance', message: 'La franchise doit être un montant positif ou nul.' });
+    }
+  }
+
+  const refi = input.refinancing;
+  if (refi) {
+    const err = (field: string, message: string) => errors.push({ field: `refinancing.${field}`, message });
+    if (!positiveInt(refi.month)) err('month', 'Le mois du refinancement doit être un entier supérieur ou égal à 1.');
+    if (!positiveInt(refi.durationMonths) || refi.durationMonths > MAX_DURATION_MONTHS) {
+      err('durationMonths', `La durée du nouveau crédit doit être comprise entre 1 mois et ${MAX_DURATION_MONTHS / 12} ans.`);
+    }
+    if (!isFiniteNumber(refi.annualRate) || refi.annualRate < 0 || refi.annualRate > MAX_ANNUAL_RATE) {
+      err('annualRate', 'Le taux du nouveau crédit est invalide.');
+    }
+    if (!isFiniteNumber(refi.deedCosts) || refi.deedCosts < 0) err('deedCosts', "Les frais d'acte doivent être positifs ou nuls.");
+    if (!isFiniteNumber(refi.processingFees) || refi.processingFees < 0) {
+      err('processingFees', 'Les frais de dossier doivent être positifs ou nuls.');
+    }
+  }
   return errors;
 }

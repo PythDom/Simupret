@@ -16,8 +16,8 @@ describe('taux', () => {
   });
 
   it('la convention r/12 donne une mensualité plus élevée', () => {
-    const eq = simulate([tranche(250_000, 20, 3.67)]);
-    const nom = simulate([tranche(250_000, 20, 3.67)], { rateConvention: 'nominal' });
+    const eq = simulate({ tranches: [tranche(250_000, 20, 3.67)] });
+    const nom = simulate({ tranches: [tranche(250_000, 20, 3.67)] }, { rateConvention: 'nominal' });
     expect(nom.months[0]!.payment).toBeGreaterThan(eq.months[0]!.payment);
     const r = 0.0367 / 12;
     expect(nom.months[0]!.payment).toBeCloseTo((250_000 * r) / (1 - Math.pow(1 + r, -240)), 9);
@@ -26,7 +26,7 @@ describe('taux', () => {
 
 describe('échéancier', () => {
   it('rembourse exactement le capital et respecte les identités comptables', () => {
-    const r = simulate([tranche(250_000, 20, 3.67)]);
+    const r = simulate({ tranches: [tranche(250_000, 20, 3.67)] });
     expect(r.totals.principal).toBeCloseTo(250_000, 6);
     expect(r.totals.payments).toBeCloseTo(r.totals.interest + r.totals.principal, 6);
     expect(r.months.at(-1)!.closingBalance).toBe(0);
@@ -37,12 +37,12 @@ describe('échéancier', () => {
   });
 
   it('ne fait aucun arrondi dans les calculs', () => {
-    const r = simulate([tranche(250_000, 20, 3.67)]);
+    const r = simulate({ tranches: [tranche(250_000, 20, 3.67)] });
     expect(r.months[0]!.payment).not.toBe(Math.round(r.months[0]!.payment * 100) / 100);
   });
 
   it('agrège par année', () => {
-    const r = simulate([tranche(250_000, 20, 3.67)]);
+    const r = simulate({ tranches: [tranche(250_000, 20, 3.67)] });
     const years = aggregateByYear(r.months);
     expect(years).toHaveLength(20);
     expect(years[0]).toMatchObject({ year: 1, firstMonth: 1, lastMonth: 12 });
@@ -52,7 +52,7 @@ describe('échéancier', () => {
   });
 
   it('gère une tranche démarrant plus tard', () => {
-    const r = simulate([tranche(100_000, 10, 3.4), tranche(50_000, 5, 3, { startMonth: 25 })]);
+    const r = simulate({ tranches: [tranche(100_000, 10, 3.4), tranche(50_000, 5, 3, { startMonth: 25 })] });
     expect(r.months[23]!.tranches).toHaveLength(1);
     expect(r.months[24]!.tranches).toHaveLength(2);
     // Le solde inclut la seconde tranche dès sa mise à disposition (mois 24).
@@ -62,7 +62,7 @@ describe('échéancier', () => {
   });
 
   it('retourne un échéancier vide sans tranche', () => {
-    const r = simulate([]);
+    const r = simulate({ tranches: [] });
     expect(r.months).toEqual([]);
     expect(r.endMonth).toBe(0);
   });
@@ -70,7 +70,7 @@ describe('échéancier', () => {
 
 describe('cas limites', () => {
   it('tranche à 0 % : mensualités égales, aucun intérêt', () => {
-    const r = simulate([tranche(30_000, 10, 0)]);
+    const r = simulate({ tranches: [tranche(30_000, 10, 0)] });
     expect(r.totals.interest).toBe(0);
     for (const m of r.months) expect(m.payment).toBeCloseTo(250, 9);
     expect(r.endMonth).toBe(120);
@@ -78,7 +78,7 @@ describe('cas limites', () => {
   });
 
   it('amortissement constant du capital', () => {
-    const r = simulate([tranche(240_000, 20, 3.67, { amortization: 'constantCapital' })]);
+    const r = simulate({ tranches: [tranche(240_000, 20, 3.67, { amortization: 'constantCapital' })] });
     const rm = monthlyRate(0.0367);
     expect(r.endMonth).toBe(240);
     for (const m of r.months) expect(m.principal).toBeCloseTo(1000, 9);
@@ -88,11 +88,11 @@ describe('cas limites', () => {
     // Intérêts totaux = r_m · 1 000 · (240 + 239 + … + 1).
     expect(r.totals.interest).toBeCloseTo(rm * 1000 * (240 * 241) / 2, 6);
     // Moins d'intérêts qu'en annuité pour le même prêt.
-    expect(r.totals.interest).toBeLessThan(simulate([tranche(240_000, 20, 3.67)]).totals.interest);
+    expect(r.totals.interest).toBeLessThan(simulate({ tranches: [tranche(240_000, 20, 3.67)] }).totals.interest);
   });
 
   it('mélange annuité et amortissement constant', () => {
-    const r = simulate([tranche(100_000, 10, 3.4), tranche(60_000, 5, 3, { amortization: 'constantCapital' })]);
+    const r = simulate({ tranches: [tranche(100_000, 10, 3.4), tranche(60_000, 5, 3, { amortization: 'constantCapital' })] });
     expect(r.totals.principal).toBeCloseTo(160_000, 6);
     expect(r.months[0]!.tranches[1]!.principal).toBeCloseTo(1000, 9);
   });
