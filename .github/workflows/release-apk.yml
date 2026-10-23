@@ -1,11 +1,17 @@
 name: APK Android
 
 # Sur un tag v* : construit l'APK et le publie dans une GitHub Release.
-# Lancement manuel (workflow_dispatch) : construit l'APK et le fournit comme artefact, sans release.
+# Lancement manuel (workflow_dispatch) : avec une version (ex. 1.0.0), crée le tag v1.0.0 et la
+# release ; sans version, fournit seulement l'APK comme artefact.
 on:
   push:
     tags: ['v*']
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version à publier (ex. 1.0.0). Vide : APK de test en artefact, sans release.'
+        required: false
+        default: ''
 
 permissions:
   contents: write
@@ -57,9 +63,13 @@ jobs:
 
       - name: Déterminer la version
         id: version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
         run: |
           if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
             VERSION="${GITHUB_REF_NAME#v}"
+          elif [[ -n "$INPUT_VERSION" ]]; then
+            VERSION="${INPUT_VERSION#v}"
           else
             VERSION="0.0.0-dev.${GITHUB_RUN_NUMBER}"
           fi
@@ -70,6 +80,9 @@ jobs:
             CODE="${GITHUB_RUN_NUMBER}"
           fi
           echo "name=$VERSION" >> "$GITHUB_OUTPUT"
+          if [[ "$GITHUB_REF_TYPE" == "tag" || -n "$INPUT_VERSION" ]]; then
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          fi
           echo "code=$CODE" >> "$GITHUB_OUTPUT"
           echo "Version $VERSION (code $CODE)"
 
@@ -116,9 +129,12 @@ jobs:
           if-no-files-found: error
 
       - name: Publier la release
-        if: github.ref_type == 'tag'
+        if: steps.version.outputs.publish == 'true'
         uses: softprops/action-gh-release@v2
         with:
+          # Lancement manuel : le tag est créé sur le commit construit.
+          tag_name: v${{ steps.version.outputs.name }}
+          target_commitish: ${{ github.sha }}
           files: dist-apk/*.apk
           name: Simulateur de crédit ${{ steps.version.outputs.name }}
           body: |

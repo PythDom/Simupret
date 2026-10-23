@@ -93,10 +93,12 @@ git tag v1.0.0
 git push origin v1.0.0
 ```
 
+Sans ligne de commande : onglet **Actions** → **APK Android** → **Run workflow**, saisissez la version
+(ex. `1.0.0`) : le workflow crée le tag `v1.0.0` et la release avec l'APK.
+
 Utilisez un numéro `MAJEUR.MINEUR.CORRECTIF` : le `versionCode` Android est calculé ainsi
-(`1.2.3` → `10203`) et doit augmenter à chaque version. Le workflow peut aussi être lancé à la main
-(onglet **Actions** → **APK Android** → **Run workflow**) : l'APK est alors disponible comme artefact,
-sans release.
+(`1.2.3` → `10203`) et doit augmenter à chaque version. Lancé à la main sans version, il fournit seulement l'APK
+comme artefact, sans release.
 
 ### Signature de l'APK
 
