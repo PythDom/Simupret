@@ -5,3 +5,5 @@ export * from './schedule';
 export * from './validation';
 export * from './penalty';
 export * from './refinance';
+export * from './grid';
+export * from './optimizer';
