@@ -18,6 +18,8 @@ disponible en **application Android (APK)** et en **version web**.
   assurance solde restant dû, tranche à 0 % (type Rénopack SWCS)
 - TAEG calculé sur les flux réels, coût d'opportunité « rembourser ou investir »
 - Optimiseur de tranches sous contrainte de budget mensuel
+- Frais de dossier, d'expertise et d'acte, assurances, TAEG sur les flux réels
+- Coût d'opportunité : rembourser anticipativement ou investir la différence
 - Comparateur, tableau d'amortissement, graphiques, export CSV / PDF
 - Mode clair et mode sombre ; données stockées uniquement sur l'appareil
 
@@ -29,7 +31,7 @@ disponible en **application Android (APK)** et en **version web**.
 4. **Optimiseur** : 5 meilleures configurations et variante « flexibilité maximale » ; un geste pour en faire un scénario.
 5. **Tableau d'amortissement** : consolidé ou par tranche, mensuel ou annuel.
 6. **Graphiques** : solde restant dû, mensualités par tranche avec budget, intérêts cumulés et capital remboursé, comparaison des coûts.
-7. **Export** : à venir.
+7. **Export** : tableau d'amortissement en CSV (format tableur belge), résumé PDF, partage via la feuille de partage Android.
 8. **À propos** : avertissement et conventions de calcul.
 
 Les scénarios et paramètres sont enregistrés automatiquement sur l'appareil.

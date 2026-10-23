@@ -4,6 +4,7 @@ import { defaultState } from '../state/defaults';
 import { renderWithStore } from '../test-utils';
 import Amortissement from './Amortissement';
 import Comparateur from './Comparateur';
+import Export from './Export';
 import Graphiques from './Graphiques';
 import Optimiseur from './Optimiseur';
 import Parametres from './Parametres';
@@ -195,5 +196,26 @@ describe('frais, assurances et TAEG', () => {
     expect(screen.getByText('Rembourser ou investir ?')).toBeInTheDocument();
     // Placement à 3 % < coût du crédit : rembourser l'emporte.
     expect(screen.getByText('Avantage : rembourser')).toBeInTheDocument();
+  });
+});
+
+describe('Export', () => {
+  it('télécharge le CSV et le PDF', async () => {
+    const created: Blob[] = [];
+    URL.createObjectURL = vi.fn((b: Blob) => {
+      created.push(b);
+      return 'blob:test';
+    });
+    URL.revokeObjectURL = vi.fn();
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+    renderWithStore(<Export />);
+    fireEvent.click(screen.getByRole('button', { name: 'Télécharger le CSV' }));
+    expect(await screen.findByText('Fichier téléchargé.')).toBeInTheDocument();
+    expect(created[0]!.type).toBe('text/csv;charset=utf-8');
+    fireEvent.click(screen.getByRole('button', { name: 'Télécharger le PDF' }));
+    await vi.waitFor(() => expect(created).toHaveLength(2));
+    expect(created[1]!.type).toBe('application/pdf');
+    expect(click).toHaveBeenCalledTimes(2);
+    expect(screen.getByRole('button', { name: 'Partager le PDF' })).toBeInTheDocument();
   });
 });

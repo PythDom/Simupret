@@ -3,6 +3,7 @@ import ThemeToggle from './components/ThemeToggle';
 import Amortissement from './screens/Amortissement';
 import APropos from './screens/APropos';
 import Comparateur from './screens/Comparateur';
+import Export from './screens/Export';
 import Optimiseur from './screens/Optimiseur';
 import Parametres from './screens/Parametres';
 import Scenarios from './screens/Scenarios';
@@ -11,16 +12,7 @@ import { SCREENS, screenFromHash, type ScreenId } from './screens/registry';
 // Recharts est volumineux : l'écran des graphiques est chargé à la demande.
 const Graphiques = lazy(() => import('./screens/Graphiques'));
 
-function Placeholder({ label }: { label: string }) {
-  return (
-    <div className="card">
-      <h2 className="text-lg font-semibold">{label}</h2>
-      <p className="mt-2 text-slate-600 dark:text-slate-400">Écran en cours de construction.</p>
-    </div>
-  );
-}
-
-function Screen({ id, label }: { id: ScreenId; label: string }) {
+function Screen({ id }: { id: ScreenId }) {
   switch (id) {
     case 'parametres':
       return <Parametres />;
@@ -41,7 +33,7 @@ function Screen({ id, label }: { id: ScreenId; label: string }) {
     case 'a-propos':
       return <APropos />;
     case 'export':
-      return <Placeholder label={label} />;
+      return <Export />;
   }
 }
 
@@ -86,7 +78,7 @@ export default function App() {
         </nav>
       </header>
       <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
-        <Screen id={current.id} label={current.label} />
+        <Screen id={current.id} />
       </main>
       <footer className="px-4 py-3 text-center text-xs text-slate-500">
         Simulation indicative — ne constitue pas un conseil financier.
