@@ -167,3 +167,13 @@ describe('validation de l\'optimiseur', () => {
     expect(errors[3]!.message).toBe('La marge de sécurité doit être inférieure au budget mensuel.');
   });
 });
+
+describe('configurations de l\'optimiseur', () => {
+  it('expose les remboursements de la variante flexible (budget − marge)', () => {
+    const r = optimize({ ...defaults, minMargin: 200 });
+    expect(r.top.every((c) => c.prepayments.length === 0)).toBe(true);
+    expect(r.flexibility!.prepayments).toEqual([
+      { kind: 'recurring', everyMonths: 12, amount: { type: 'budget', monthlyBudget: 2300, penaltyWithinBudget: true } },
+    ]);
+  });
+});

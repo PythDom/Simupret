@@ -96,3 +96,22 @@ export function parseNumber(input: string): number | null {
   if (!/^-?\d+(\.\d+)?$/.test(s)) return null;
   return Number(s);
 }
+
+/** « JJ/MM/AAAA » → « AAAA-MM-JJ », ou `null` si la date est invalide. */
+export function parseDate(input: string): string | null {
+  const m = /^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/.exec(input.trim());
+  if (!m) return null;
+  const [, dd, mm, yyyy] = m;
+  const d = Number(dd);
+  const mo = Number(mm);
+  const y = Number(yyyy);
+  const date = new Date(y, mo - 1, d);
+  if (date.getFullYear() !== y || date.getMonth() !== mo - 1 || date.getDate() !== d) return null;
+  return `${yyyy}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+}
+
+/** « AAAA-MM-JJ » → « JJ/MM/AAAA ». */
+export function isoToDisplay(iso: string): string {
+  const [y, m, d] = iso.split('-');
+  return `${d}/${m}/${y}`;
+}

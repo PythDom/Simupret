@@ -3,7 +3,7 @@ import { GRID_DURATIONS_YEARS, quotite, quotiteTier, type QuotiteTier, type Rate
 import { DEFAULT_PENALTY } from './penalty';
 import { monthlyRate } from './rates';
 import { DEFAULT_OPTIONS, simulate } from './schedule';
-import type { PenaltyConfig, SimulationOptions, SimulationResult, Tranche, ValidationError } from './types';
+import type { PenaltyConfig, Prepayment, SimulationOptions, SimulationResult, Tranche, ValidationError } from './types';
 
 export interface OptimizerInput {
   /** Montant à emprunter (€). */
@@ -43,6 +43,8 @@ export const OPTIMIZER_DEFAULTS = {
 
 export interface OptimizerConfiguration {
   tranches: Tranche[];
+  /** Remboursements anticipés de la configuration (variante flexible uniquement). */
+  prepayments: Prepayment[];
   /** Coût total : intérêts (+ indemnités pour la variante flexible). */
   totalCost: number;
   interest: number;
@@ -147,12 +149,14 @@ function toTranches(parts: Candidate['parts'], prefix: string): Tranche[] {
 
 function buildConfiguration(
   tranches: Tranche[],
+  prepayments: Prepayment[],
   simulation: SimulationResult,
   budget: number,
 ): OptimizerConfiguration {
   const peakPayment = simulation.months.reduce((m, r) => Math.max(m, r.payment), 0);
   return {
     tranches,
+    prepayments,
     totalCost: simulation.totals.interest + simulation.totals.penalties,
     interest: simulation.totals.interest,
     penalties: simulation.totals.penalties,
@@ -205,7 +209,7 @@ export function optimize(input: OptimizerInput, options: SimulationOptions = DEF
   feasible.sort((a, b) => a.cost - b.cost || a.peak - b.peak);
   const top = feasible.slice(0, topN).map((c, i) => {
     const tranches = toTranches(c.parts, `opt${i + 1}-`);
-    return buildConfiguration(tranches, simulate({ tranches }, options), input.monthlyBudget);
+    return buildConfiguration(tranches, [], simulate({ tranches }, options), input.monthlyBudget);
   });
 
   const flexibility = flexibilityVariant(input, gridOptions, limit, options);
@@ -249,21 +253,15 @@ function flexibilityVariant(
   const parts = [{ option: longest, amount: input.amount }];
   if (evaluate(parts).peak > limit + 1e-9) return null;
   const tranches = toTranches(parts, 'flex-');
-  const simulation = simulate(
+  const prepayments: Prepayment[] = [
     {
-      tranches,
-      prepayments: [
-        {
-          kind: 'recurring',
-          everyMonths: input.flexPrepaymentEveryMonths ?? OPTIMIZER_DEFAULTS.flexPrepaymentEveryMonths,
-          amount: { type: 'budget', monthlyBudget: limit, penaltyWithinBudget: true },
-        },
-      ],
-      penalty: input.penalty ?? DEFAULT_PENALTY,
+      kind: 'recurring',
+      everyMonths: input.flexPrepaymentEveryMonths ?? OPTIMIZER_DEFAULTS.flexPrepaymentEveryMonths,
+      amount: { type: 'budget', monthlyBudget: limit, penaltyWithinBudget: true },
     },
-    options,
-  );
-  return buildConfiguration(tranches, simulation, input.monthlyBudget);
+  ];
+  const simulation = simulate({ tranches, prepayments, penalty: input.penalty ?? DEFAULT_PENALTY }, options);
+  return buildConfiguration(tranches, prepayments, simulation, input.monthlyBudget);
 }
 
 /** Valide les paramètres de l'optimiseur ; messages en français. */

@@ -21,6 +21,19 @@ disponible en **application Android (APK)** et en **version web**.
 - Comparateur, tableau d'amortissement, graphiques, export CSV / PDF
 - Mode clair et mode sombre ; données stockées uniquement sur l'appareil
 
+## Écrans
+
+1. **Paramètres** : montant, valeur du bien et quotité, budget, durée maximale, marge, grille de taux, indemnité de remploi, convention de taux.
+2. **Scénarios** : tranches, remboursements anticipés, refinancement (avec seuil de rentabilité) ; créer, renommer, dupliquer, supprimer.
+3. **Comparateur** : 2 à 4 scénarios côte à côte.
+4. **Optimiseur** : 5 meilleures configurations et variante « flexibilité maximale » ; un geste pour en faire un scénario.
+5. **Tableau d'amortissement** : consolidé ou par tranche, mensuel ou annuel.
+6. **Graphiques** : solde restant dû, mensualités par tranche avec budget, intérêts cumulés et capital remboursé, comparaison des coûts.
+7. **Export** : à venir.
+8. **À propos** : avertissement et conventions de calcul.
+
+Les scénarios et paramètres sont enregistrés automatiquement sur l'appareil.
+
 ## Captures d'écran
 
 | Paramètres | Optimiseur | Graphiques |
@@ -46,8 +59,10 @@ npm run build      # build web de production dans dist/
 src/
 ├─ engine/   moteur financier en TypeScript pur (aucune dépendance UI), testé avec Vitest
 ├─ format/   formatage fr-BE (montants « 1 464,00 € », dates JJ/MM/AAAA)
+├─ state/    état de l'application, scénarios, valeurs par défaut
+├─ storage/  sauvegarde locale (Capacitor Preferences)
 ├─ screens/  écrans de l'application
-└─ components/
+└─ components/  champs de saisie, graphiques (Recharts)
 ```
 
 ## Application Android

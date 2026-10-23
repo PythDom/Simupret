@@ -97,3 +97,17 @@ describe('cas limites', () => {
     expect(r.months[0]!.tranches[1]!.principal).toBeCloseTo(1000, 9);
   });
 });
+
+describe('synthèse', () => {
+  it('résume un scénario à deux tranches', async () => {
+    const { summarize } = await import('../summary');
+    const r = simulate({ tranches: [tranche(200_000, 10, 3.4), tranche(50_000, 15, 3.55)] });
+    const s = summarize(r, 2500);
+    expectEuro(s.firstPayment, 2321);
+    expectEuro(s.peakPayment, 2321);
+    expectEuro(s.lowestPayment, 357);
+    expectEuro(s.minMargin, 179);
+    expectEuro(s.totalCost, 49_933);
+    expect(s.endMonth).toBe(180);
+  });
+});

@@ -50,3 +50,14 @@ describe('formatage fr-BE', () => {
     expect(parseNumber('1,2,3')).toBeNull();
   });
 });
+
+describe('dates saisies', () => {
+  it('lit et réécrit les dates JJ/MM/AAAA', async () => {
+    const { parseDate, isoToDisplay } = await import('./index');
+    expect(parseDate('01/11/2026')).toBe('2026-11-01');
+    expect(parseDate('1/2/2027')).toBe('2027-02-01');
+    expect(parseDate('31/02/2027')).toBeNull();
+    expect(parseDate('2027-02-01')).toBeNull();
+    expect(isoToDisplay('2026-11-01')).toBe('01/11/2026');
+  });
+});
