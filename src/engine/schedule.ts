@@ -47,20 +47,26 @@ interface TrancheState {
 function initState(tranche: Tranche, options: SimulationOptions, penalty: PenaltyConfig): TrancheState {
   const rate = monthlyRate(tranche.annualRate, options.rateConvention);
   const n = tranche.durationMonths;
+  const repayable = repayableAmount(tranche);
   return {
     tranche,
     rate,
     penaltyRate: penaltyRate(rate, penalty),
-    balance: tranche.amount,
+    balance: repayable,
     lastMonth: tranche.startMonth + n - 1,
     level:
       tranche.amortization === 'annuity'
-        ? annuityPayment(tranche.amount, rate, n)
-        : constantPrincipal(tranche.amount, n),
+        ? annuityPayment(repayable, rate, n)
+        : constantPrincipal(repayable, n),
     allowance: yearlyAllowance(penalty.allowance, tranche.amount),
     allowanceUsed: new Map(),
     current: null,
   };
+}
+
+/** Montant effectivement à rembourser : capital − réduction éventuelle. */
+export function repayableAmount(tranche: Tranche): number {
+  return Math.max(0, tranche.amount - (tranche.reduction ?? 0));
 }
 
 function stepTranche(s: TrancheState, month: number): TrancheMonth {
@@ -216,7 +222,16 @@ export function simulate(input: SimulationInput, options: SimulationOptions = DE
   const budgetSavings = new Map<Prepayment, number>();
 
   const months: MonthRow[] = [];
-  const totals = { payments: 0, interest: 0, principal: 0, prepayments: 0, penalties: 0, fees: 0, cashOut: 0 };
+  const totals = {
+    payments: 0,
+    interest: 0,
+    principal: 0,
+    prepayments: 0,
+    penalties: 0,
+    fees: 0,
+    cashOut: 0,
+    reductions: input.tranches.reduce((s, t) => s + (t.amount - repayableAmount(t)), 0),
+  };
   let unusedPrepayment = 0;
   let endMonth = 0;
 

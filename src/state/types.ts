@@ -1,4 +1,4 @@
-import type { PenaltyConfig, Prepayment, RateConvention, RateGrid, Refinancing, Tranche } from '../engine';
+import type { LoanCosts, PenaltyConfig, Prepayment, RateConvention, RateGrid, Refinancing, Tranche } from '../engine';
 
 export interface Settings {
   /** Montant à emprunter (€). */
@@ -18,6 +18,10 @@ export interface Settings {
   rateConvention: RateConvention;
   /** Date de la première échéance, ISO AAAA-MM-JJ. */
   firstPaymentDate: string;
+  /** Frais et assurances liés au crédit. */
+  costs: LoanCosts;
+  /** Rendement annuel net d'un placement, pour le coût d'opportunité. */
+  investmentReturn: number;
 }
 
 export interface Scenario {

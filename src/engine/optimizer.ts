@@ -1,8 +1,10 @@
 import { annuityPayment } from './amortization';
 import { GRID_DURATIONS_YEARS, quotite, quotiteTier, type QuotiteTier, type RateGrid } from './grid';
+import { NO_COSTS, upfrontFees, type LoanCosts } from './costs';
 import { DEFAULT_PENALTY } from './penalty';
 import { monthlyRate } from './rates';
 import { DEFAULT_OPTIONS, simulate } from './schedule';
+import { summarize } from './summary';
 import type { PenaltyConfig, Prepayment, SimulationOptions, SimulationResult, Tranche, ValidationError } from './types';
 
 export interface OptimizerInput {
@@ -27,6 +29,8 @@ export interface OptimizerInput {
   penalty?: PenaltyConfig;
   /** Périodicité des remboursements de la variante flexible (défaut 12 mois). */
   flexPrepaymentEveryMonths?: number;
+  /** Frais et assurances inclus dans le coût total (défaut : aucun). */
+  costs?: LoanCosts;
 }
 
 export const OPTIMIZER_DEFAULTS = {
@@ -45,10 +49,14 @@ export interface OptimizerConfiguration {
   tranches: Tranche[];
   /** Remboursements anticipés de la configuration (variante flexible uniquement). */
   prepayments: Prepayment[];
-  /** Coût total : intérêts (+ indemnités pour la variante flexible). */
+  /** Coût total : intérêts + indemnités + frais + assurances. */
   totalCost: number;
   interest: number;
   penalties: number;
+  /** Frais et assurances. */
+  costs: number;
+  /** TAEG de la configuration. */
+  taeg: number | null;
   /** Mensualité la plus élevée sur la durée du crédit. */
   peakPayment: number;
   /** Marge minimale : budget − mensualité la plus élevée. */
@@ -119,19 +127,45 @@ function* compositions(units: number, k: number): Generator<number[]> {
   }
 }
 
+/** Solde d'une annuité après `k` échéances. */
+function annuityBalance(amount: number, rate: number, pmt: number, k: number): number {
+  if (rate === 0) return Math.max(0, amount - pmt * k);
+  const g = Math.pow(1 + rate, k);
+  return Math.max(0, amount * g - (pmt * (g - 1)) / rate);
+}
+
 /**
  * Évaluation analytique d'une combinaison de tranches en annuités démarrant
  * toutes au mois 1 : la mensualité totale est maximale au mois 1 (somme des
- * annuités) et le coût est Σ (annuité × durée − capital).
+ * annuités), les intérêts valent Σ (annuité × durée − capital), et les frais
+ * et assurances suivent les mêmes règles que `costBreakdown`.
  */
-function evaluate(parts: Candidate['parts']): Candidate {
-  let cost = 0;
+function evaluate(parts: Candidate['parts'], costs: LoanCosts): Candidate {
+  let cost = upfrontFees(costs);
   let peak = 0;
+  let end = 0;
+  const pmts: number[] = [];
   for (const { option, amount } of parts) {
     const pmt = annuityPayment(amount, option.rate, option.months);
+    pmts.push(pmt);
     peak += pmt;
     cost += pmt * option.months - amount;
+    end = Math.max(end, option.months);
   }
+  const ins = costs.balanceInsurance;
+  if (ins.kind === 'single') cost += ins.premium;
+  const years = Math.ceil(end / 12);
+  if (ins.kind === 'annualPercent') {
+    // Prime au début de chaque année de crédit sur le solde restant dû.
+    for (let y = 0; y < years; y++) {
+      const k = 12 * y;
+      parts.forEach(({ option, amount }, i) => {
+        if (k < option.months) cost += ins.rate * annuityBalance(amount, option.rate, pmts[i]!, k);
+      });
+    }
+  }
+  if (costs.fireInsurance.enabled) cost += costs.fireInsurance.annualPremium * years;
+  if (costs.bankAccount.enabled) cost += costs.bankAccount.monthlyFee * end;
   return { parts, cost, peak };
 }
 
@@ -152,14 +186,19 @@ function buildConfiguration(
   prepayments: Prepayment[],
   simulation: SimulationResult,
   budget: number,
+  costs: LoanCosts,
+  penalty: PenaltyConfig,
 ): OptimizerConfiguration {
   const peakPayment = simulation.months.reduce((m, r) => Math.max(m, r.payment), 0);
+  const { summary } = summarize({ tranches, prepayments, penalty }, simulation, budget, costs);
   return {
     tranches,
     prepayments,
-    totalCost: simulation.totals.interest + simulation.totals.penalties,
+    totalCost: summary.totalCost,
     interest: simulation.totals.interest,
     penalties: simulation.totals.penalties,
+    costs: summary.totalCost - simulation.totals.interest - simulation.totals.penalties,
+    taeg: summary.taeg,
     peakPayment,
     minMargin: budget - peakPayment,
     endMonth: simulation.endMonth,
@@ -175,6 +214,8 @@ function buildConfiguration(
 export function optimize(input: OptimizerInput, options: SimulationOptions = DEFAULT_OPTIONS): OptimizerResult {
   const step = input.amountStep ?? OPTIMIZER_DEFAULTS.amountStep;
   const topN = input.topN ?? OPTIMIZER_DEFAULTS.topN;
+  const costs = input.costs ?? NO_COSTS;
+  const penalty = input.penalty ?? DEFAULT_PENALTY;
   const limit = input.monthlyBudget - input.minMargin;
   const q = quotite(input.amount, input.propertyValue);
   const tier = quotiteTier(q);
@@ -198,7 +239,7 @@ export function optimize(input: OptimizerInput, options: SimulationOptions = DEF
           amount: (split[i] ?? 0) * step + (i === 0 ? remainder : 0),
         }));
         if (parts.some((p) => p.amount <= 0)) continue;
-        const c = evaluate(parts);
+        const c = evaluate(parts, costs);
         evaluated++;
         if (lowestPossiblePayment === null || c.peak < lowestPossiblePayment) lowestPossiblePayment = c.peak;
         if (c.peak <= limit + 1e-9) feasible.push(c);
@@ -209,10 +250,10 @@ export function optimize(input: OptimizerInput, options: SimulationOptions = DEF
   feasible.sort((a, b) => a.cost - b.cost || a.peak - b.peak);
   const top = feasible.slice(0, topN).map((c, i) => {
     const tranches = toTranches(c.parts, `opt${i + 1}-`);
-    return buildConfiguration(tranches, [], simulate({ tranches }, options), input.monthlyBudget);
+    return buildConfiguration(tranches, [], simulate({ tranches }, options), input.monthlyBudget, costs, penalty);
   });
 
-  const flexibility = flexibilityVariant(input, gridOptions, limit, options);
+  const flexibility = flexibilityVariant(input, gridOptions, limit, options, costs, penalty);
   const best = top[0];
   let message: string | null = null;
   if (gridOptions.length === 0) {
@@ -247,11 +288,13 @@ function flexibilityVariant(
   gridOptions: readonly GridOption[],
   limit: number,
   options: SimulationOptions,
+  costs: LoanCosts,
+  penalty: PenaltyConfig,
 ): OptimizerConfiguration | null {
   const longest = gridOptions[gridOptions.length - 1];
   if (!longest) return null;
   const parts = [{ option: longest, amount: input.amount }];
-  if (evaluate(parts).peak > limit + 1e-9) return null;
+  if (evaluate(parts, costs).peak > limit + 1e-9) return null;
   const tranches = toTranches(parts, 'flex-');
   const prepayments: Prepayment[] = [
     {
@@ -260,8 +303,8 @@ function flexibilityVariant(
       amount: { type: 'budget', monthlyBudget: limit, penaltyWithinBudget: true },
     },
   ];
-  const simulation = simulate({ tranches, prepayments, penalty: input.penalty ?? DEFAULT_PENALTY }, options);
-  return buildConfiguration(tranches, prepayments, simulation, input.monthlyBudget);
+  const simulation = simulate({ tranches, prepayments, penalty }, options);
+  return buildConfiguration(tranches, prepayments, simulation, input.monthlyBudget, costs, penalty);
 }
 
 /** Valide les paramètres de l'optimiseur ; messages en français. */

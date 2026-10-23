@@ -166,26 +166,31 @@ export interface CostBar {
   name: string;
   interest: number;
   penalties: number;
+  /** Frais de dossier, d'expertise, d'acte et de refinancement. */
   fees: number;
+  /** Assurance solde restant dû, incendie, compte bancaire. */
+  insurance: number;
 }
 
 /** Comparaison des coûts entre scénarios (barres horizontales empilées). */
 export function CostComparisonChart({ data }: { data: readonly CostBar[] }) {
   const theme = chartTheme(useIsDark());
-  const hasPenalties = data.some((d) => d.penalties > 0);
-  const hasFees = data.some((d) => d.fees > 0);
+  // Ordre et couleur fixes par composante, même si certaines sont absentes.
   const parts = [
-    { key: 'interest', label: 'Intérêts', show: true },
-    { key: 'penalties', label: 'Indemnités de remploi', show: hasPenalties },
-    { key: 'fees', label: 'Frais', show: hasFees },
-  ].filter((p) => p.show);
+    { key: 'interest', label: 'Intérêts', color: 0 },
+    { key: 'penalties', label: 'Indemnités de remploi', color: 1 },
+    { key: 'fees', label: 'Frais', color: 2 },
+    { key: 'insurance', label: 'Assurances', color: 3 },
+  ].filter((p) => data.some((d) => d[p.key as keyof CostBar] !== 0));
   const height = Math.max(160, data.length * 56 + 60);
-  const xTicks = niceTicks(Math.max(...data.map((d) => d.interest + d.penalties + d.fees)), 5);
+  const xTicks = niceTicks(Math.max(...data.map((d) => d.interest + d.penalties + d.fees + d.insurance)), 5);
   return (
     <figure className="card space-y-2">
       <figcaption>
         <h3 className="font-semibold">Comparaison des coûts</h3>
-        <p className="text-sm text-slate-500 dark:text-slate-400">Coût total de chaque scénario</p>
+        <p className="text-sm text-slate-500 dark:text-slate-400">
+          Intérêts, indemnités, frais et assurances de chaque scénario (avant réductions éventuelles)
+        </p>
       </figcaption>
       <div className="w-full" style={{ height }}>
         <ResponsiveContainer width="100%" height="100%">
@@ -204,7 +209,7 @@ export function CostComparisonChart({ data }: { data: readonly CostBar[] }) {
                 dataKey={p.key}
                 name={p.label}
                 stackId="cost"
-                fill={seriesColor(theme, i)}
+                fill={seriesColor(theme, p.color)}
                 maxBarSize={24}
                 stroke={theme.surface}
                 strokeWidth={i > 0 ? 2 : 0}

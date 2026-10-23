@@ -16,7 +16,18 @@ export default function Graphiques() {
     const list = state.compareIds.length >= 2 ? state.scenarios.filter((s) => state.compareIds.includes(s.id)) : state.scenarios;
     return list.flatMap((s) => {
       const c = computeScenario(s, settings);
-      return c.summary ? [{ name: s.name, interest: c.summary.interest, penalties: c.summary.penalties, fees: c.summary.fees }] : [];
+      const m = c.summary;
+      return m
+        ? [
+            {
+              name: s.name,
+              interest: m.interest,
+              penalties: m.penalties,
+              fees: m.upfrontCosts + m.refinancingFees,
+              insurance: m.balanceInsurance + m.linkedCosts,
+            },
+          ]
+        : [];
     });
   }, [state.scenarios, state.compareIds, settings]);
 

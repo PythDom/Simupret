@@ -25,6 +25,7 @@ export default function Optimiseur() {
       maxTranches: s.maxTranches,
       rateGrid: s.rateGrid,
       penalty: s.penalty,
+      costs: s.costs,
     }),
     [s],
   );
@@ -44,7 +45,7 @@ export default function Optimiseur() {
       <Card title={<span className="flex items-center gap-2">Optimiseur <IndicativeBadge /></span>}>
         <p className="text-sm text-slate-600 dark:text-slate-400">
           Recherche des combinaisons de 1 à {s.maxTranches} tranches (durées de la grille, montants par pas de 5 000 €) qui
-          minimisent le coût total, avec une mensualité toujours inférieure ou égale à{' '}
+          minimisent le coût total (intérêts, frais et assurances), avec une mensualité toujours inférieure ou égale à{' '}
           <strong>{formatEuro(s.monthlyBudget - s.minMargin)}</strong> (budget − marge). Modifiez les paramètres dans
           l&apos;écran « Paramètres ».
         </p>
@@ -131,7 +132,12 @@ function ResultCard({
         </Button>
       </div>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <Stat label="Coût total" value={formatEuroRounded(c.totalCost)} hint={c.penalties > 0 ? `dont ${formatEuroRounded(c.penalties)} d'indemnités` : 'Intérêts'} />
+        <Stat
+          label="Coût total"
+          value={formatEuroRounded(c.totalCost)}
+          hint={`dont ${formatEuroRounded(c.costs)} de frais et assurances${c.penalties > 0 ? ` et ${formatEuroRounded(c.penalties)} d'indemnités` : ''}`}
+        />
+        <Stat label="TAEG" value={c.taeg === null ? '—' : formatPercent(c.taeg)} />
         <Stat label="Mensualité maximale" value={formatEuro(c.peakPayment)} />
         <Stat label={flexible ? 'Marge si arrêt des versements' : 'Marge minimale'} value={formatEuro(c.minMargin)} />
         <Stat label="Fin du crédit" value={formatDate(monthDate(firstPaymentDate, c.endMonth))} hint={formatDuration(c.endMonth)} />

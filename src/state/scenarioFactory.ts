@@ -19,6 +19,20 @@ export function defaultTranche(settings: Settings, amount: number): Tranche {
   };
 }
 
+/** Tranche à 0 % pour travaux économiseurs d'énergie (type Rénopack SWCS) : valeurs à adapter. */
+export function zeroRateTranche(): Tranche {
+  return {
+    id: newId('tr'),
+    label: 'Prêt à 0 % (type Rénopack)',
+    amount: 30_000,
+    durationMonths: 120,
+    annualRate: 0,
+    startMonth: 1,
+    amortization: 'annuity',
+    reduction: 0,
+  };
+}
+
 export function newScenario(settings: Settings, index: number): Scenario {
   return {
     id: newId('sc'),

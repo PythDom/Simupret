@@ -101,8 +101,8 @@ describe('cas limites', () => {
 describe('synthèse', () => {
   it('résume un scénario à deux tranches', async () => {
     const { summarize } = await import('../summary');
-    const r = simulate({ tranches: [tranche(200_000, 10, 3.4), tranche(50_000, 15, 3.55)] });
-    const s = summarize(r, 2500);
+    const input = { tranches: [tranche(200_000, 10, 3.4), tranche(50_000, 15, 3.55)] };
+    const { summary: s } = summarize(input, simulate(input), 2500);
     expectEuro(s.firstPayment, 2321);
     expectEuro(s.peakPayment, 2321);
     expectEuro(s.lowestPayment, 357);

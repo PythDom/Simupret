@@ -1,6 +1,8 @@
 import { useMemo } from 'react';
 import {
   analyzeRefinancing,
+  compareOpportunity,
+  type ScenarioAnalysis,
   type AmortizationType,
   type Prepayment,
   type PrepaymentEffect,
@@ -9,11 +11,11 @@ import {
   type Tranche,
   type ValidationError,
 } from '../engine';
-import { formatDate, formatDuration, formatEuro, formatEuroRounded } from '../format';
+import { formatDate, formatDuration, formatEuro, formatEuroRounded, formatPercent } from '../format';
 import { CheckboxField, NumberField, PercentField, SelectField, TextField } from '../components/fields';
 import { Button, Card, ErrorList, Grid, Stat } from '../components/ui';
 import { computeScenario, monthDate, scenarioInput } from '../state/derived';
-import { defaultTranche, newScenario } from '../state/scenarioFactory';
+import { defaultTranche, newScenario, zeroRateTranche } from '../state/scenarioFactory';
 import { useStore } from '../state/context';
 import type { Scenario, Settings } from '../state/types';
 
@@ -117,7 +119,10 @@ function ScenarioEditor({ scenario, settings }: { scenario: Scenario; settings: 
             />
             <Stat label="Intérêts totaux" value={formatEuroRounded(summary.interest)} />
             <Stat label="Indemnités de remploi" value={formatEuroRounded(summary.penalties)} />
-            <Stat label="Coût total" value={formatEuroRounded(summary.totalCost)} hint="Intérêts + indemnités + frais" />
+            <Stat label="Frais et assurances" value={formatEuroRounded(summary.upfrontCosts + summary.balanceInsurance + summary.linkedCosts + summary.refinancingFees)} />
+            {summary.reductions > 0 ? <Stat label="Réductions" value={`− ${formatEuroRounded(summary.reductions)}`} hint="Primes, subsides" /> : null}
+            <Stat label="Coût total" value={formatEuroRounded(summary.totalCost)} hint="Intérêts + indemnités + frais + assurances" />
+            <Stat label="TAEG" value={summary.taeg === null ? '—' : formatPercent(summary.taeg)} hint="Sur les flux réels" />
             <Stat
               label="Fin du crédit"
               value={formatDate(monthDate(settings.firstPaymentDate, summary.endMonth))}
@@ -136,9 +141,14 @@ function ScenarioEditor({ scenario, settings }: { scenario: Scenario; settings: 
         title="Tranches"
         actions={
           scenario.tranches.length < 6 ? (
-            <Button onClick={() => update({ tranches: [...scenario.tranches, defaultTranche(settings, 50_000)] })}>
-              Ajouter une tranche
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button onClick={() => update({ tranches: [...scenario.tranches, defaultTranche(settings, 50_000)] })}>
+                Ajouter une tranche
+              </Button>
+              <Button onClick={() => update({ tranches: [...scenario.tranches, zeroRateTranche()] })}>
+                Tranche à 0 % (type Rénopack)
+              </Button>
+            </div>
           ) : null
         }
       >
@@ -186,6 +196,15 @@ function ScenarioEditor({ scenario, settings }: { scenario: Scenario; settings: 
                     { value: 'constantCapital', label: 'Amortissement constant du capital' },
                   ]}
                   onChange={(amortization) => updateTranche(i, { amortization })}
+                />
+                <NumberField
+                  label="Réduction du montant à rembourser"
+                  unit="€"
+                  min={0}
+                  value={t.reduction ?? 0}
+                  onChange={(reduction) => updateTranche(i, { reduction })}
+                  hint="Prime ou subside déduit du capital à rembourser (facultatif)."
+                  error={fieldError(errors, `tranches[${i}].reduction`)}
                 />
               </Grid>
               {scenario.tranches.length > 1 ? (
@@ -257,6 +276,10 @@ function ScenarioEditor({ scenario, settings }: { scenario: Scenario; settings: 
       </Card>
 
       <RefinancingEditor scenario={scenario} settings={settings} errors={errors} onChange={(refinancing) => update({ refinancing })} />
+
+      {scenario.prepayments.length > 0 && computation.analysis ? (
+        <OpportunityCard scenario={scenario} settings={settings} analysis={computation.analysis} />
+      ) : null}
     </>
   );
 }
@@ -379,6 +402,43 @@ function PrepaymentEditor({
         </Button>
       </div>
     </fieldset>
+  );
+}
+
+/** « Rembourser anticipativement » ou « investir la différence » ? */
+function OpportunityCard({ scenario, settings, analysis }: { scenario: Scenario; settings: Settings; analysis: ScenarioAnalysis }) {
+  const opportunity = useMemo(() => {
+    const withoutPrepay = computeScenario({ ...scenario, prepayments: [] }, settings).analysis;
+    if (!withoutPrepay) return null;
+    return compareOpportunity(
+      { result: analysis.result, costs: analysis.costs },
+      { result: withoutPrepay.result, costs: withoutPrepay.costs },
+      settings.investmentReturn,
+    );
+  }, [scenario, settings, analysis]);
+  if (!opportunity) return null;
+  const prepayWins = opportunity.advantagePrepay >= 0;
+  return (
+    <Card title="Rembourser ou investir ?">
+      <p className="text-sm text-slate-600 dark:text-slate-400">
+        Même effort mensuel dans les deux cas : soit les remboursements anticipés de ce scénario, soit le même crédit sans
+        remboursement anticipé et la différence placée à {formatPercent(settings.investmentReturn)} net par an (modifiable
+        dans « Paramètres »). Comparaison du patrimoine net après {formatDuration(opportunity.horizonMonths)}.
+      </p>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <Stat label="Patrimoine — rembourser" value={formatEuroRounded(opportunity.wealthPrepay)} />
+        <Stat label="Patrimoine — investir" value={formatEuroRounded(opportunity.wealthInvest)} />
+        <Stat
+          label={prepayWins ? 'Avantage : rembourser' : 'Avantage : investir'}
+          value={formatEuroRounded(Math.abs(opportunity.advantagePrepay))}
+        />
+        <Stat
+          label="Rendement d'équilibre"
+          value={opportunity.breakEvenReturn === null ? '—' : formatPercent(opportunity.breakEvenReturn)}
+          hint="Au-delà, investir rapporte davantage"
+        />
+      </div>
+    </Card>
   );
 }
 

@@ -28,7 +28,7 @@ describe('Paramètres', () => {
 
   it('affiche la grille de taux indicative en pourcentage', () => {
     renderWithStore(<Parametres />);
-    expect(screen.getByText('valeurs indicatives')).toBeInTheDocument();
+    expect(screen.getAllByText('valeurs indicatives')).toHaveLength(2);
     expect(screen.getByLabelText('Taux 20 ans, quotité 80–90 %')).toHaveValue('3,67');
     expect(screen.getByLabelText('Taux 15 ans, quotité 80–90 %')).toHaveValue('3,55');
   });
@@ -38,8 +38,9 @@ describe('Scénarios', () => {
   it('affiche la synthèse du scénario sélectionné', () => {
     renderWithStore(<Scenarios />);
     expect(screen.getByText(`1${NBSP}464,03${NBSP}€`)).toBeInTheDocument();
-    // Intérêts et coût total (sans frais pour l'instant) : 101 367 €.
-    expect(screen.getAllByText(`101${NBSP}367${NBSP}€`)).toHaveLength(2);
+    expect(screen.getByText(`101${NBSP}367${NBSP}€`)).toBeInTheDocument();
+    // Avec les frais et assurances indicatifs : TAEG 4,06 %.
+    expect(screen.getByText(`4,06${NBSP}%`)).toBeInTheDocument();
   });
 
   it('renomme, duplique et supprime un scénario', () => {
@@ -150,5 +151,49 @@ describe('Graphiques', () => {
     for (const title of ['Solde restant dû', 'Mensualités par tranche', 'Intérêts cumulés et capital remboursé', 'Comparaison des coûts']) {
       expect(screen.getByRole('heading', { name: title })).toBeInTheDocument();
     }
+  });
+});
+
+describe('frais, assurances et TAEG', () => {
+  const state = () => defaultState(new Date(2026, 9, 23));
+
+  it('le TAEG égale le taux sans frais ni assurance', () => {
+    const st = state();
+    const costs = { ...st.settings.costs, processingFees: 0, appraisalFees: 0, deedInscription: 0, balanceInsurance: { kind: 'none' as const } };
+    renderWithStore(<Scenarios />, { ...st, settings: { ...st.settings, costs } });
+    expect(screen.getByText(`3,67${NBSP}%`)).toBeInTheDocument();
+  });
+
+  it('les frais saisis dans Paramètres modifient le TAEG du comparateur', () => {
+    renderWithStore(
+      <>
+        <Parametres />
+        <Comparateur />
+      </>,
+    );
+    const taegRow = () => screen.getByRole('rowheader', { name: /^TAEG/ }).closest('tr')!;
+    const before = taegRow().textContent;
+    fireEvent.change(screen.getByLabelText('Frais de dossier'), { target: { value: '5 000' } });
+    expect(taegRow().textContent).not.toBe(before);
+  });
+
+  it('ajoute une tranche à 0 % avec réduction', () => {
+    renderWithStore(<Scenarios />);
+    fireEvent.click(screen.getByRole('button', { name: 'Tranche à 0 % (type Rénopack)' }));
+    expect(screen.getByText('Prêt à 0 % (type Rénopack)')).toBeInTheDocument();
+    const reductions = screen.getAllByLabelText('Réduction du montant à rembourser');
+    fireEvent.change(reductions[1]!, { target: { value: '3 000' } });
+    expect(screen.getByText('Réductions')).toBeInTheDocument();
+    fireEvent.change(reductions[1]!, { target: { value: '40 000' } });
+    expect(screen.getAllByText('La réduction doit être positive et inférieure au montant de la tranche.').length).toBeGreaterThan(0);
+  });
+
+  it('compare « rembourser » et « investir » quand il y a des remboursements anticipés', () => {
+    renderWithStore(<Scenarios />);
+    expect(screen.queryByText('Rembourser ou investir ?')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Récurrent' }));
+    expect(screen.getByText('Rembourser ou investir ?')).toBeInTheDocument();
+    // Placement à 3 % < coût du crédit : rembourser l'emporte.
+    expect(screen.getByText('Avantage : rembourser')).toBeInTheDocument();
   });
 });

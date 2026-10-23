@@ -28,6 +28,12 @@ export interface Tranche {
    */
   startMonth: number;
   amortization: AmortizationType;
+  /**
+   * Réduction du montant à rembourser (prime, subside), par ex. pour une
+   * tranche à 0 % de type Rénopack SWCS. Le montant débloqué reste `amount` ;
+   * seul `amount − reduction` est amorti.
+   */
+  reduction?: number;
 }
 
 export interface SimulationOptions {
@@ -174,6 +180,8 @@ export interface ScheduleTotals {
   penalties: number;
   fees: number;
   cashOut: number;
+  /** Total des réductions de montant à rembourser. */
+  reductions: number;
 }
 
 export interface SimulationResult {

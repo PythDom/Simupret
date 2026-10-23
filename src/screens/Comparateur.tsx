@@ -1,6 +1,6 @@
 import { useMemo, type ReactNode } from 'react';
 import type { ScenarioSummary } from '../engine';
-import { formatDate, formatDuration, formatEuro, formatEuroRounded } from '../format';
+import { formatDate, formatDuration, formatEuro, formatEuroRounded, formatPercent } from '../format';
 import { Card, Notice } from '../components/ui';
 import { computeScenario, monthDate } from '../state/derived';
 import { useStore } from '../state/context';
@@ -30,8 +30,15 @@ export default function Comparateur() {
     { label: 'Mensualité minimale', value: (s) => s.lowestPayment, format: (v) => formatEuro(v) },
     { label: 'Intérêts totaux', value: (s) => s.interest, format: (v) => formatEuroRounded(v), best: 'min' },
     { label: 'Indemnités de remploi', value: (s) => s.penalties, format: (v) => formatEuroRounded(v) },
-    { label: 'Coût total', value: (s) => s.totalCost, format: (v) => formatEuroRounded(v), best: 'min', hint: 'Intérêts + indemnités + frais' },
-    { label: 'TAEG', value: () => null, format: () => '—', hint: 'Disponible avec la prise en compte des frais' },
+    {
+      label: 'Frais et assurances',
+      value: (s) => s.upfrontCosts + s.refinancingFees + s.balanceInsurance + s.linkedCosts,
+      format: (v) => formatEuroRounded(v),
+      best: 'min',
+    },
+    { label: 'Réductions', value: (s) => s.reductions, format: (v) => (v > 0 ? `− ${formatEuroRounded(v)}` : '—') },
+    { label: 'Coût total', value: (s) => s.totalCost, format: (v) => formatEuroRounded(v), best: 'min', hint: 'Intérêts + indemnités + frais + assurances − réductions' },
+    { label: 'TAEG', value: (s) => s.taeg, format: (v) => formatPercent(v), best: 'min', hint: 'Sur les flux réels' },
     {
       label: 'Date de fin',
       value: (s) => s.endMonth,

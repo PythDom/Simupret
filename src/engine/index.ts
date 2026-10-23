@@ -8,3 +8,6 @@ export * from './refinance';
 export * from './grid';
 export * from './optimizer';
 export * from './summary';
+export * from './costs';
+export * from './taeg';
+export * from './opportunity';

@@ -30,6 +30,9 @@ export function validateTranche(t: Tranche, path = 'tranche'): ValidationError[]
   if (!Number.isInteger(t.startMonth) || t.startMonth < 1) {
     err('startMonth', 'Le mois de la première échéance doit être un entier supérieur ou égal à 1.');
   }
+  if (t.reduction !== undefined && (!isFiniteNumber(t.reduction) || t.reduction < 0 || t.reduction >= t.amount)) {
+    err('reduction', 'La réduction doit être positive et inférieure au montant de la tranche.');
+  }
   if (t.amortization !== 'annuity' && t.amortization !== 'constantCapital') {
     err('amortization', "Le type d'amortissement est inconnu.");
   }

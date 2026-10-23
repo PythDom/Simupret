@@ -1,4 +1,4 @@
-import { DEFAULT_PENALTY, DEFAULT_RATE_GRID, OPTIMIZER_DEFAULTS, type Tranche } from '../engine';
+import { DEFAULT_COSTS, DEFAULT_PENALTY, DEFAULT_RATE_GRID, OPTIMIZER_DEFAULTS, type Tranche } from '../engine';
 import type { AppState, Scenario, Settings } from './types';
 
 /** Premier jour du mois suivant `now`, au format ISO. */
@@ -19,6 +19,8 @@ export function defaultSettings(now?: Date): Settings {
     penalty: { ...DEFAULT_PENALTY, allowance: { ...DEFAULT_PENALTY.allowance } },
     rateConvention: 'equivalent',
     firstPaymentDate: nextMonthIso(now),
+    costs: structuredCloneGrid(DEFAULT_COSTS),
+    investmentReturn: 0.03,
   };
 }
 

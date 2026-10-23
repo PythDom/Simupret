@@ -1,8 +1,8 @@
 import { useMemo } from 'react';
 import {
-  simulate,
-  summarize,
+  analyzeScenario,
   validateSimulationInput,
+  type ScenarioAnalysis,
   type ScenarioSummary,
   type SimulationInput,
   type SimulationResult,
@@ -22,6 +22,7 @@ export function scenarioInput(scenario: Scenario, settings: Settings): Simulatio
 export interface ScenarioComputation {
   input: SimulationInput;
   errors: ValidationError[];
+  analysis: ScenarioAnalysis | null;
   result: SimulationResult | null;
   summary: ScenarioSummary | null;
 }
@@ -29,9 +30,9 @@ export interface ScenarioComputation {
 export function computeScenario(scenario: Scenario, settings: Settings): ScenarioComputation {
   const input = scenarioInput(scenario, settings);
   const errors = validateSimulationInput(input);
-  if (errors.length > 0) return { input, errors, result: null, summary: null };
-  const result = simulate(input, { rateConvention: settings.rateConvention });
-  return { input, errors, result, summary: summarize(result, settings.monthlyBudget) };
+  if (errors.length > 0) return { input, errors, analysis: null, result: null, summary: null };
+  const analysis = analyzeScenario(input, settings.monthlyBudget, settings.costs, { rateConvention: settings.rateConvention });
+  return { input, errors, analysis, result: analysis.result, summary: analysis.summary };
 }
 
 export function useScenarioComputation(scenario: Scenario | undefined, settings: Settings): ScenarioComputation | null {
