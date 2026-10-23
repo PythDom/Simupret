@@ -1,0 +1,43 @@
+{
+  "name": "simupret-desktop",
+  "productName": "Simulateur de crédit",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Simulateur de crédit hypothécaire belge — version Windows portable",
+  "license": "MIT",
+  "main": "main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "dist:win": "electron-builder --win portable --x64 --publish never"
+  },
+  "devDependencies": {
+    "electron": "44.7.0",
+    "electron-builder": "26.15.3"
+  },
+  "build": {
+    "appId": "io.github.pythdom.simupret",
+    "productName": "Simulateur de crédit",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.cjs",
+      "app/**/*"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png"
+    },
+    "portable": {
+      "artifactName": "Simupret-${version}-portable.exe"
+    }
+  }
+}

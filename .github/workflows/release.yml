@@ -1,0 +1,225 @@
+name: Publication (APK et EXE)
+
+# Construit l'APK Android et l'exécutable Windows portable, puis les publie dans une GitHub Release.
+# - Tag v* : release de ce tag.
+# - Lancement manuel avec une version (ex. 1.0.0) : crée le tag v1.0.0 et la release.
+# - Lancement manuel sans version : fichiers disponibles comme artefacts, sans release.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version à publier (ex. 1.0.0). Vide : fichiers de test en artefacts, sans release.'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}-${{ inputs.version }}
+  cancel-in-progress: false
+
+jobs:
+  version:
+    name: Version
+    runs-on: ubuntu-latest
+    outputs:
+      name: ${{ steps.v.outputs.name }}
+      code: ${{ steps.v.outputs.code }}
+      publish: ${{ steps.v.outputs.publish }}
+    steps:
+      - id: v
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          elif [[ -n "$INPUT_VERSION" ]]; then
+            VERSION="${INPUT_VERSION#v}"
+          else
+            VERSION="0.0.0-dev.${GITHUB_RUN_NUMBER}"
+          fi
+          # versionCode Android : MAJEUR*10000 + MINEUR*100 + CORRECTIF pour x.y.z, sinon numéro d'exécution.
+          if [[ "$VERSION" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+            CODE=$(( BASH_REMATCH[1] * 10000 + BASH_REMATCH[2] * 100 + BASH_REMATCH[3] ))
+          else
+            CODE="${GITHUB_RUN_NUMBER}"
+          fi
+          echo "name=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "code=$CODE" >> "$GITHUB_OUTPUT"
+          if [[ "$GITHUB_REF_TYPE" == "tag" || -n "$INPUT_VERSION" ]]; then
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          fi
+          echo "Version $VERSION (code $CODE)"
+
+  apk:
+    name: APK Android
+    needs: version
+    runs-on: ubuntu-latest
+    outputs:
+      signed: ${{ steps.keystore.outputs.signed }}
+    env:
+      # Secrets de signature (voir README). S'ils sont absents, un APK debug est produit.
+      KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+      APP_VERSION_NAME: ${{ needs.version.outputs.name }}
+      APP_VERSION_CODE: ${{ needs.version.outputs.code }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Installer les dépendances
+        run: npm ci
+
+      - name: Tests
+        run: npm test
+
+      - name: Build web
+        run: npm run build
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+
+      - uses: android-actions/setup-android@v3
+        with:
+          # Le paquet « tools » installé par défaut n'existe plus dans sdkmanager.
+          packages: 'platform-tools platforms;android-36 build-tools;36.0.0'
+
+      - name: Synchroniser Capacitor
+        run: npx cap sync android
+
+      - name: Décoder le keystore
+        id: keystore
+        if: env.KEYSTORE_BASE64 != ''
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.keystore"
+          echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/release.keystore" >> "$GITHUB_ENV"
+          echo "signed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Construire l'APK signé (release)
+        if: steps.keystore.outputs.signed == 'true'
+        working-directory: android
+        run: |
+          ./gradlew --no-daemon assembleRelease
+          mkdir -p ../dist-release
+          cp app/build/outputs/apk/release/app-release.apk "../dist-release/simupret-${APP_VERSION_NAME}.apk"
+
+      - name: Construire l'APK debug (secrets de signature absents)
+        if: steps.keystore.outputs.signed != 'true'
+        working-directory: android
+        run: |
+          echo "::warning::Secrets de signature absents : construction d'un APK debug."
+          ./gradlew --no-daemon assembleDebug
+          mkdir -p ../dist-release
+          cp app/build/outputs/apk/debug/app-debug.apk "../dist-release/simupret-${APP_VERSION_NAME}-debug.apk"
+
+      - name: Vérifier la signature
+        run: |
+          APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
+          "$APKSIGNER" verify --print-certs dist-release/*.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: apk
+          path: dist-release/*.apk
+          if-no-files-found: error
+
+  exe:
+    name: EXE Windows portable
+    needs: version
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    env:
+      APP_VERSION_NAME: ${{ needs.version.outputs.name }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            desktop/package-lock.json
+
+      - name: Build web
+        run: |
+          npm ci
+          npm run build
+
+      - name: Installer Electron
+        working-directory: desktop
+        run: |
+          npm ci
+          rm -rf app
+          cp -r ../dist app
+
+      - name: Test de fumée (l'application démarre et affiche les graphiques)
+        working-directory: desktop
+        env:
+          SIMUPRET_SMOKE_TEST: '1'
+        run: npx electron .
+
+      - name: Construire l'exécutable portable
+        working-directory: desktop
+        run: npx electron-builder --win portable --x64 --publish never -c.extraMetadata.version="$APP_VERSION_NAME"
+
+      - name: Rassembler l'exécutable
+        run: |
+          mkdir -p dist-release
+          cp desktop/release/*.exe dist-release/
+          ls -l dist-release
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: exe
+          path: dist-release/*.exe
+          if-no-files-found: error
+
+  publish:
+    name: Publier la release
+    needs: [version, apk, exe]
+    if: needs.version.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist-release
+          merge-multiple: true
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          # Lancement manuel : le tag est créé sur le commit construit.
+          tag_name: v${{ needs.version.outputs.name }}
+          target_commitish: ${{ github.sha }}
+          name: Simulateur de crédit ${{ needs.version.outputs.name }}
+          files: dist-release/*
+          body: |
+            ## Android
+
+            1. Téléchargez le fichier `.apk` ci-dessous depuis votre téléphone.
+            2. Ouvrez-le et autorisez l'installation depuis cette source si Android le demande.
+
+            ${{ needs.apk.outputs.signed == 'true' && 'APK signé avec la clé de publication.' || 'APK **debug** (usage personnel) : une future version signée ne pourra pas le mettre à jour ; il faudra d''abord le désinstaller.' }}
+
+            ## Windows
+
+            Téléchargez `Simupret-…-portable.exe` et lancez-le : aucune installation. Les données sont
+            enregistrées dans le dossier « Simupret-données » à côté de l'exécutable.
+            L'exécutable n'est pas signé : Windows SmartScreen peut afficher « Windows a protégé votre
+            ordinateur » ; cliquez sur « Informations complémentaires » puis « Exécuter quand même ».
+
+            Simulation indicative : ne constitue pas un conseil financier.

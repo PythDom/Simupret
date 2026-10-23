@@ -1,7 +1,7 @@
 # Simulateur de crédit hypothécaire
 
 Simulateur et optimiseur de crédit hypothécaire selon les conventions belges (Wallonie),
-disponible en **application Android (APK)** et en **version web**.
+disponible en **application Android (APK)**, en **exécutable Windows portable** et en **version web**.
 
 > ⚠️ **Simulation indicative.** Cette application ne constitue ni une offre de crédit ni un
 > conseil financier. Les taux et frais proposés par défaut sont des valeurs indicatives
@@ -67,6 +67,7 @@ src/
 ├─ components/  champs de saisie, graphiques (Recharts)
 └─ export/   CSV, résumé PDF, partage
 android/     projet Android (Capacitor)
+desktop/     version Windows portable (Electron)
 assets/      icône et écran de démarrage (sources)
 ```
 
@@ -86,19 +87,21 @@ signée ultérieure ne pourra pas la mettre à jour, il faudra d'abord la désin
 
 ### Publier une version
 
-Chaque tag `v*` déclenche le workflow **APK Android**, qui construit l'APK et l'attache à une GitHub Release :
+Le workflow **Publication (APK et EXE)** construit l'APK Android et l'exécutable Windows portable, puis
+les attache à une GitHub Release.
 
-```bash
-git tag v1.0.0
-git push origin v1.0.0
-```
+- **Sans ligne de commande** : onglet **Actions** → **Publication (APK et EXE)** → **Run workflow**,
+  saisissez la version (ex. `1.0.1`) : le workflow crée le tag `v1.0.1` et la release.
+- **Avec un tag** :
 
-Sans ligne de commande : onglet **Actions** → **APK Android** → **Run workflow**, saisissez la version
-(ex. `1.0.0`) : le workflow crée le tag `v1.0.0` et la release avec l'APK.
+  ```bash
+  git tag v1.0.1
+  git push origin v1.0.1
+  ```
 
 Utilisez un numéro `MAJEUR.MINEUR.CORRECTIF` : le `versionCode` Android est calculé ainsi
-(`1.2.3` → `10203`) et doit augmenter à chaque version. Lancé à la main sans version, il fournit seulement l'APK
-comme artefact, sans release.
+(`1.2.3` → `10203`) et doit augmenter à chaque version. Lancé à la main sans version, le workflow
+fournit seulement les fichiers comme artefacts, sans release.
 
 ### Signature de l'APK
 
@@ -157,6 +160,26 @@ cd android && ./gradlew assembleDebug
 ```
 
 Ou `npm run android:open` pour ouvrir le projet dans Android Studio.
+
+## Windows (exécutable portable)
+
+Téléchargez `Simupret-x.y.z-portable.exe` depuis la page **Releases** et lancez-le : aucune
+installation n'est nécessaire. Les scénarios et paramètres sont enregistrés dans le dossier
+`Simupret-données` créé à côté de l'exécutable (l'ensemble peut être copié sur une clé USB).
+
+L'exécutable n'est pas signé : au premier lancement, Windows SmartScreen peut afficher « Windows a
+protégé votre ordinateur ». Cliquez sur **Informations complémentaires** puis **Exécuter quand même**.
+
+L'exécutable est construit avec [Electron](https://www.electronjs.org/) à partir de la version web
+(dossier `desktop/`). Pour le construire sur un PC Windows :
+
+```bash
+npm ci && npm run build
+cd desktop
+npm ci
+rm -rf app && cp -r ../dist app      # PowerShell : Remove-Item app -Recurse; Copy-Item ../dist app -Recurse
+npm run dist:win                      # → desktop/release/Simupret-<version>-portable.exe
+```
 
 ## Version web (GitHub Pages)
 
