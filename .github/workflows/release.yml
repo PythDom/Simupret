@@ -204,10 +204,17 @@ jobs:
     if: needs.version.outputs.publish == 'true'
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v5
+        with:
+          sparse-checkout: docs
+
       - uses: actions/download-artifact@v4
         with:
           path: dist-release
           merge-multiple: true
+
+      - name: Joindre le guide de l'utilisateur
+        run: cp docs/guide-utilisateur.pdf dist-release/
 
       - uses: softprops/action-gh-release@v2
         with:
@@ -230,5 +237,9 @@ jobs:
             enregistrées dans le dossier « Simupret-données » à côté de l'exécutable.
             L'exécutable n'est pas signé : Windows SmartScreen peut afficher « Windows a protégé votre
             ordinateur » ; cliquez sur « Informations complémentaires » puis « Exécuter quand même ».
+
+            ## Guide
+
+            `guide-utilisateur.pdf` : guide de l'utilisateur en français.
 
             Simulation indicative : ne constitue pas un conseil financier.

@@ -7,6 +7,8 @@ disponible en **application Android (APK)**, en **exécutable Windows portable**
 > conseil financier. Les taux et frais proposés par défaut sont des valeurs indicatives
 > (octobre 2026). Seule l'offre du prêteur fait foi.
 
+📖 **[Guide de l'utilisateur](docs/guide-utilisateur.md)** (également en [PDF](docs/guide-utilisateur.pdf), joint à chaque release).
+
 ## Fonctionnalités
 
 - Taux mensuel équivalent `(1 + r)^(1/12) − 1` (pratique belge), avec comparaison en `r/12`
