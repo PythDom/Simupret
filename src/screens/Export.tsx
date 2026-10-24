@@ -6,6 +6,7 @@ import { ScenarioPicker } from '../components/ScenarioPicker';
 import { trancheSeries } from '../components/charts/data';
 import { Button, Card, ErrorList, Notice } from '../components/ui';
 import { useStore } from '../state/context';
+import { bankById } from '../state/banks';
 import { useScenarioComputation } from '../state/derived';
 import { buildRows, type Granularity } from '../state/tableRows';
 
@@ -19,7 +20,7 @@ export default function Export() {
   const { state } = useStore();
   const { settings } = state;
   const scenario = state.scenarios.find((s) => s.id === state.selectedScenarioId);
-  const computation = useScenarioComputation(scenario, settings);
+  const computation = useScenarioComputation(scenario, state);
   const [view, setView] = useState('all');
   const [granularity, setGranularity] = useState<Granularity>('month');
   const [status, setStatus] = useState<string | null>(null);
@@ -47,7 +48,7 @@ export default function Export() {
   async function pdfFile(): Promise<ExportFile | null> {
     if (!computation || !scenario) return null;
     const { buildSummaryPdf } = await import('../export/pdf');
-    const doc = buildSummaryPdf(scenario, settings, computation);
+    const doc = buildSummaryPdf(scenario, settings, computation, bankById(state.banks, scenario.bankId));
     return { filename: `${base}-resume.pdf`, mimeType: 'application/pdf', content: doc.output('arraybuffer') };
   }
 

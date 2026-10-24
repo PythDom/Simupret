@@ -17,7 +17,9 @@ disponible en **application Android (APK)**, en **exécutable Windows portable**
 - Frais de dossier, expertise, frais d'acte (inscription / mandat hypothécaire),
   assurance solde restant dû, tranche à 0 % (type Rénopack SWCS)
 - TAEG calculé sur les flux réels, coût d'opportunité « rembourser ou investir »
-- Optimiseur de tranches sous contrainte de budget mensuel
+- Optimiseur de tranches sous contrainte de budget mensuel, pour une banque ou toutes
+- Banques : moyennes du marché publiées par la Banque nationale de Belgique (mise à jour en un geste),
+  profils de banques avec leurs taux, frais et assurances
 - Frais de dossier, d'expertise et d'acte, assurances, TAEG sur les flux réels
 - Coût d'opportunité : rembourser anticipativement ou investir la différence
 - Comparateur, tableau d'amortissement, graphiques, export CSV / PDF
@@ -25,16 +27,33 @@ disponible en **application Android (APK)**, en **exécutable Windows portable**
 
 ## Écrans
 
-1. **Paramètres** : montant, valeur du bien et quotité, budget, durée maximale, marge, grille de taux, indemnité de remploi, convention de taux.
-2. **Scénarios** : tranches, remboursements anticipés, refinancement (avec seuil de rentabilité) ; créer, renommer, dupliquer, supprimer.
-3. **Comparateur** : 2 à 4 scénarios côte à côte.
-4. **Optimiseur** : 5 meilleures configurations et variante « flexibilité maximale » ; un geste pour en faire un scénario.
-5. **Tableau d'amortissement** : consolidé ou par tranche, mensuel ou annuel.
-6. **Graphiques** : solde restant dû, mensualités par tranche avec budget, intérêts cumulés et capital remboursé, comparaison des coûts.
-7. **Export** : tableau d'amortissement en CSV (format tableur belge), résumé PDF, partage via la feuille de partage Android.
-8. **À propos** : avertissement et conventions de calcul.
+1. **Paramètres** : montant, valeur du bien et quotité, budget, durée maximale, marge, indemnité de remploi, convention de taux, rendement d'un placement.
+2. **Banques** : moyennes du marché (BNB) avec bouton « Mettre à jour », banques personnelles (nouvelle, dupliquer, supprimer, par défaut) avec grille de taux, frais et assurances.
+3. **Scénarios** : tranches, remboursements anticipés, refinancement (avec seuil de rentabilité) ; créer, renommer, dupliquer, supprimer.
+4. **Comparateur** : 2 à 4 scénarios côte à côte.
+5. **Optimiseur** : 5 meilleures configurations et variante « flexibilité maximale » ; un geste pour en faire un scénario.
+6. **Tableau d'amortissement** : consolidé ou par tranche, mensuel ou annuel.
+7. **Graphiques** : solde restant dû, mensualités par tranche avec budget, intérêts cumulés et capital remboursé, comparaison des coûts.
+8. **Export** : tableau d'amortissement en CSV (format tableur belge), résumé PDF, partage via la feuille de partage Android.
+9. **À propos** : avertissement et conventions de calcul.
 
 Les scénarios et paramètres sont enregistrés automatiquement sur l'appareil.
+
+## Moyennes du marché (Banque nationale de Belgique)
+
+Le profil « Moyenne du marché (BNB) » utilise les statistiques MIR de la Banque nationale de Belgique :
+taux moyens des nouveaux crédits hypothécaires aux ménages, par période de fixation du taux, et TAEG
+moyen. Elles sont diffusées par l'API publique du
+[portail de données de la BCE](https://data.ecb.europa.eu/data/datasets/MIR) (séries
+`MIR.M.BE.B.A2C.*`), sans clé ni compte, et publiées environ 5 à 6 semaines après la fin du mois.
+
+- Le bouton **Mettre à jour** (écran Banques) récupère les derniers chiffres. Sans connexion, la copie
+  embarquée dans l'application est utilisée ; elle est actualisée à chaque publication.
+- La BNB publie des taux par période de fixation, pas par durée ni par quotité : la grille utilise la
+  fixation de 5 à 10 ans pour 10 ans, et celle de plus de 10 ans pour 15, 20 et 25 ans, pour toutes les
+  quotités.
+- Ce sont des moyennes, pas des offres. Pour comparer des banques, créez une banque (elle part des
+  moyennes) et saisissez les conditions de son offre (fiche ESIS).
 
 ## Captures d'écran
 

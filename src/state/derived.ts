@@ -8,7 +8,8 @@ import {
   type SimulationResult,
   type ValidationError,
 } from '../engine';
-import type { Scenario, Settings } from './types';
+import { bankById } from './banks';
+import type { AppState, Scenario, Settings } from './types';
 
 export function scenarioInput(scenario: Scenario, settings: Settings): SimulationInput {
   return {
@@ -27,16 +28,22 @@ export interface ScenarioComputation {
   summary: ScenarioSummary | null;
 }
 
-export function computeScenario(scenario: Scenario, settings: Settings): ScenarioComputation {
+/** Ce dont le calcul d'un scénario a besoin : réglages et conditions des banques. */
+export type ComputeContext = Pick<AppState, 'settings' | 'banks'>;
+
+export function computeScenario(scenario: Scenario, ctx: ComputeContext): ScenarioComputation {
+  const { settings } = ctx;
   const input = scenarioInput(scenario, settings);
   const errors = validateSimulationInput(input);
   if (errors.length > 0) return { input, errors, analysis: null, result: null, summary: null };
-  const analysis = analyzeScenario(input, settings.monthlyBudget, settings.costs, { rateConvention: settings.rateConvention });
+  const bank = bankById(ctx.banks, scenario.bankId);
+  const analysis = analyzeScenario(input, settings.monthlyBudget, bank.costs, { rateConvention: settings.rateConvention });
   return { input, errors, analysis, result: analysis.result, summary: analysis.summary };
 }
 
-export function useScenarioComputation(scenario: Scenario | undefined, settings: Settings): ScenarioComputation | null {
-  return useMemo(() => (scenario ? computeScenario(scenario, settings) : null), [scenario, settings]);
+export function useScenarioComputation(scenario: Scenario | undefined, ctx: ComputeContext): ScenarioComputation | null {
+  const { settings, banks } = ctx;
+  return useMemo(() => (scenario ? computeScenario(scenario, { settings, banks }) : null), [scenario, settings, banks]);
 }
 
 /** Date de l'échéance du mois `month` (mois 1 = première échéance). */

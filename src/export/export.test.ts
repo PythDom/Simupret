@@ -14,7 +14,7 @@ describe('export CSV', () => {
   });
 
   it('exporte 240 lignes mensuelles avec en-tête et BOM', () => {
-    const c = computeScenario(state.scenarios[0]!, state.settings);
+    const c = computeScenario(state.scenarios[0]!, state);
     const csv = scheduleToCsv(buildRows(c.result!.months, 'month', state.settings.firstPaymentDate), 'month');
     expect(csv.startsWith('﻿')).toBe(true);
     // trim() supprimerait aussi le BOM : on ne retire que la fin.
@@ -28,7 +28,7 @@ describe('export CSV', () => {
   });
 
   it('exporte un tableau annuel', () => {
-    const c = computeScenario(state.scenarios[1]!, state.settings);
+    const c = computeScenario(state.scenarios[1]!, state);
     const csv = scheduleToCsv(buildRows(c.result!.months, 'year', state.settings.firstPaymentDate), 'year');
     const lines = csv.trim().split('\r\n');
     expect(lines).toHaveLength(16);
@@ -49,7 +49,8 @@ describe('export PDF', () => {
 
   it('génère un résumé de scénario', () => {
     const sc = state.scenarios[1]!;
-    const doc = buildSummaryPdf(sc, state.settings, computeScenario(sc, state.settings), new Date(2026, 9, 23));
+    const doc = buildSummaryPdf(sc, state.settings, computeScenario(sc, state), state.banks[0], new Date(2026, 9, 23));
+    expect(doc.output()).toContain('Moyenne du march');
     expect(doc.getNumberOfPages()).toBeGreaterThanOrEqual(1);
     const raw = doc.output();
     expect(raw.startsWith('%PDF-')).toBe(true);
@@ -58,7 +59,7 @@ describe('export PDF', () => {
 
   it('signale un scénario invalide dans le PDF', () => {
     const sc = { ...state.scenarios[0]!, tranches: [{ ...state.scenarios[0]!.tranches[0]!, amount: -1 }] };
-    const doc = buildSummaryPdf(sc, state.settings, computeScenario(sc, state.settings));
+    const doc = buildSummaryPdf(sc, state.settings, computeScenario(sc, state));
     expect(doc.output()).toContain('Sc');
     expect(doc.output()).toContain('invalide');
   });

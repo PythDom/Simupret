@@ -2,6 +2,7 @@ import { Suspense, lazy, useEffect, useState } from 'react';
 import ThemeToggle from './components/ThemeToggle';
 import Amortissement from './screens/Amortissement';
 import APropos from './screens/APropos';
+import Banques from './screens/Banques';
 import Comparateur from './screens/Comparateur';
 import Export from './screens/Export';
 import Optimiseur from './screens/Optimiseur';
@@ -16,6 +17,8 @@ function Screen({ id }: { id: ScreenId }) {
   switch (id) {
     case 'parametres':
       return <Parametres />;
+    case 'banques':
+      return <Banques />;
     case 'scenarios':
       return <Scenarios />;
     case 'comparateur':

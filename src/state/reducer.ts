@@ -1,5 +1,7 @@
+import type { MarketData } from '../market/nbb';
+import { applyMarketData } from './banks';
 import { newId } from './ids';
-import type { AppState, Scenario, Settings } from './types';
+import { MARKET_BANK_ID, type AppState, type BankProfile, type Scenario, type Settings } from './types';
 
 export type Action =
   | { type: 'hydrate'; state: AppState }
@@ -9,7 +11,11 @@ export type Action =
   | { type: 'scenario/duplicate'; id: string }
   | { type: 'scenario/delete'; id: string }
   | { type: 'scenario/select'; id: string }
-  | { type: 'compare/toggle'; id: string };
+  | { type: 'compare/toggle'; id: string }
+  | { type: 'bank/add'; bank: BankProfile }
+  | { type: 'bank/update'; id: string; patch: Partial<Omit<BankProfile, 'id' | 'kind'>> }
+  | { type: 'bank/delete'; id: string }
+  | { type: 'market/update'; market: MarketData };
 
 export const MAX_COMPARE = 4;
 
@@ -37,6 +43,7 @@ export function cloneScenario(s: Scenario, name: string): Scenario {
     tranches,
     prepayments,
     refinancing: s.refinancing ? { ...s.refinancing } : null,
+    bankId: s.bankId,
     updatedAt: now(),
   };
 }
@@ -79,6 +86,31 @@ export function reducer(state: AppState, action: Action): AppState {
     }
     case 'scenario/select':
       return { ...state, selectedScenarioId: action.id };
+    case 'bank/add':
+      return { ...state, banks: [...state.banks, action.bank] };
+    case 'bank/update':
+      return {
+        ...state,
+        banks: state.banks.map((b) => {
+          if (b.id !== action.id) return b;
+          // La grille et la date du profil BNB ne changent que par mise à jour des moyennes.
+          const patch =
+            b.kind === 'market' ? { ...action.patch, rateGrid: b.rateGrid, ratesDate: b.ratesDate, name: b.name } : action.patch;
+          return { ...b, ...patch };
+        }),
+      };
+    case 'bank/delete': {
+      if (action.id === MARKET_BANK_ID) return state;
+      return {
+        ...state,
+        banks: state.banks.filter((b) => b.id !== action.id),
+        scenarios: state.scenarios.map((s) => (s.bankId === action.id ? { ...s, bankId: MARKET_BANK_ID } : s)),
+        settings:
+          state.settings.defaultBankId === action.id ? { ...state.settings, defaultBankId: MARKET_BANK_ID } : state.settings,
+      };
+    }
+    case 'market/update':
+      return applyMarketData(state, action.market);
     case 'compare/toggle': {
       const has = state.compareIds.includes(action.id);
       if (has) return { ...state, compareIds: state.compareIds.filter((id) => id !== action.id) };

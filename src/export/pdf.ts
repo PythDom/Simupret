@@ -1,11 +1,11 @@
 import { jsPDF } from 'jspdf';
 import { autoTable } from 'jspdf-autotable';
 import { QUOTITE_TIER_LABELS, quotite, quotiteTier, type Prepayment } from '../engine';
-import { formatDate, formatDuration, formatEuro, formatPercent } from '../format';
+import { formatDate, formatDuration, formatEuro, formatPercent, ratesDateLabel } from '../format';
 import type { ScenarioComputation } from '../state/derived';
 import { monthDate } from '../state/derived';
 import { buildRows } from '../state/tableRows';
-import type { Scenario, Settings } from '../state/types';
+import type { BankProfile, Scenario, Settings } from '../state/types';
 
 export const DISCLAIMER =
   "Simulation indicative : ce document ne constitue ni une offre de crédit ni un conseil financier. " +
@@ -41,7 +41,13 @@ function describePrepayment(p: Prepayment, scenario: Scenario): string {
 }
 
 /** Construit le résumé PDF d'un scénario. */
-export function buildSummaryPdf(scenario: Scenario, settings: Settings, computation: ScenarioComputation, now = new Date()): jsPDF {
+export function buildSummaryPdf(
+  scenario: Scenario,
+  settings: Settings,
+  computation: ScenarioComputation,
+  bank?: BankProfile,
+  now = new Date(),
+): jsPDF {
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const margin = 14;
   const width = doc.internal.pageSize.getWidth() - 2 * margin;
@@ -82,6 +88,7 @@ export function buildSummaryPdf(scenario: Scenario, settings: Settings, computat
     ['Valeur du bien', formatEuro(settings.propertyValue)],
     ['Quotité', `${formatPercent(q, 1)} (${QUOTITE_TIER_LABELS[quotiteTier(q)]})`],
     ['Budget mensuel', formatEuro(settings.monthlyBudget)],
+    ...(bank ? [['Banque (frais et assurances)', `${bank.name} - taux du ${ratesDateLabel(bank.ratesDate)}`]] : []),
     ['Première échéance', formatDate(monthDate(settings.firstPaymentDate, 1))],
     ['Taux mensuel', settings.rateConvention === 'equivalent' ? 'Taux équivalent (1 + r)^(1/12) - 1' : 'Taux proportionnel r / 12'],
   ]);

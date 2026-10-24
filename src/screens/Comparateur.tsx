@@ -2,6 +2,7 @@ import { useMemo, type ReactNode } from 'react';
 import type { ScenarioSummary } from '../engine';
 import { formatDate, formatDuration, formatEuro, formatEuroRounded, formatPercent } from '../format';
 import { Card, Notice } from '../components/ui';
+import { bankById } from '../state/banks';
 import { computeScenario, monthDate } from '../state/derived';
 import { useStore } from '../state/context';
 import { MAX_COMPARE } from '../state/reducer';
@@ -20,8 +21,8 @@ export default function Comparateur() {
   const { settings } = state;
   const selected = state.scenarios.filter((s) => state.compareIds.includes(s.id));
   const computed = useMemo(
-    () => selected.map((s) => ({ scenario: s, computation: computeScenario(s, settings) })),
-    [selected, settings],
+    () => selected.map((s) => ({ scenario: s, computation: computeScenario(s, state) })),
+    [selected, state],
   );
 
   const rows: Row[] = [
@@ -94,6 +95,7 @@ export default function Comparateur() {
                   {computed.map(({ scenario }) => (
                     <th key={scenario.id} scope="col" className="px-2 py-2 text-right font-semibold">
                       {scenario.name}
+                      <span className="block text-xs font-normal text-slate-500">{bankById(state.banks, scenario.bankId).name}</span>
                     </th>
                   ))}
                 </tr>

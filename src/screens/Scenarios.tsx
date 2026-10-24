@@ -11,13 +11,15 @@ import {
   type Tranche,
   type ValidationError,
 } from '../engine';
-import { formatDate, formatDuration, formatEuro, formatEuroRounded, formatPercent } from '../format';
+import { formatDate, formatDuration, formatEuro, formatEuroRounded, formatPercent, ratesDateLabel } from '../format';
 import { CheckboxField, NumberField, PercentField, SelectField, TextField } from '../components/fields';
 import { Button, Card, ErrorList, Grid, Stat } from '../components/ui';
 import { computeScenario, monthDate, scenarioInput } from '../state/derived';
-import { defaultTranche, newScenario, zeroRateTranche } from '../state/scenarioFactory';
+import { latest } from '../market/nbb';
+import { bankById } from '../state/banks';
 import { useStore } from '../state/context';
-import type { Scenario, Settings } from '../state/types';
+import { applyBankRates, defaultTranche, newScenario, zeroRateTranche } from '../state/scenarioFactory';
+import type { BankProfile, Scenario, Settings } from '../state/types';
 
 function fieldError(errors: readonly ValidationError[], path: string): string | null {
   return errors.find((e) => e.field === path)?.message ?? null;
@@ -35,7 +37,10 @@ export default function Scenarios() {
           <Button
             variant="primary"
             onClick={() =>
-              dispatch({ type: 'scenario/add', scenario: newScenario(state.settings, state.scenarios.length + 1) })
+              dispatch({
+                type: 'scenario/add',
+                scenario: newScenario(state.settings, bankById(state.banks, state.settings.defaultBankId), state.scenarios.length + 1),
+              })
             }
           >
             Nouveau scénario
@@ -79,15 +84,18 @@ export default function Scenarios() {
         )}
       </Card>
 
-      {scenario ? <ScenarioEditor key={scenario.id} scenario={scenario} settings={state.settings} /> : null}
+      {scenario ? <ScenarioEditor key={scenario.id} scenario={scenario} /> : null}
     </div>
   );
 }
 
-function ScenarioEditor({ scenario, settings }: { scenario: Scenario; settings: Settings }) {
-  const { dispatch } = useStore();
+function ScenarioEditor({ scenario }: { scenario: Scenario }) {
+  const { state, dispatch } = useStore();
+  const { settings, banks, market } = state;
   const update = (patch: Partial<Omit<Scenario, 'id'>>) => dispatch({ type: 'scenario/update', id: scenario.id, patch });
-  const computation = useMemo(() => computeScenario(scenario, settings), [scenario, settings]);
+  const computation = useMemo(() => computeScenario(scenario, { settings, banks }), [scenario, settings, banks]);
+  const bank = bankById(banks, scenario.bankId);
+  const marketAprc = latest(market, 'aprc');
   const { errors, summary } = computation;
 
   const updateTranche = (i: number, patch: Partial<Tranche>) =>
@@ -105,6 +113,18 @@ function ScenarioEditor({ scenario, settings }: { scenario: Scenario; settings: 
           onChange={(name) => update({ name })}
           error={scenario.name.trim() === '' ? 'Donnez un nom au scénario.' : null}
         />
+        <SelectField
+          label="Banque"
+          value={bank.id}
+          options={banks.map((b) => ({ value: b.id, label: b.name }))}
+          onChange={(bankId) => update({ bankId })}
+          hint={`Frais et assurances de cette banque. Taux du ${ratesDateLabel(bank.ratesDate)}.`}
+        />
+        <div>
+          <Button onClick={() => update({ tranches: applyBankRates(scenario.tranches, settings, bank) })}>
+            Appliquer les taux de cette banque aux tranches
+          </Button>
+        </div>
       </Card>
 
       <Card title="Synthèse">
@@ -122,7 +142,15 @@ function ScenarioEditor({ scenario, settings }: { scenario: Scenario; settings: 
             <Stat label="Frais et assurances" value={formatEuroRounded(summary.upfrontCosts + summary.balanceInsurance + summary.linkedCosts + summary.refinancingFees)} />
             {summary.reductions > 0 ? <Stat label="Réductions" value={`− ${formatEuroRounded(summary.reductions)}`} hint="Primes, subsides" /> : null}
             <Stat label="Coût total" value={formatEuroRounded(summary.totalCost)} hint="Intérêts + indemnités + frais + assurances" />
-            <Stat label="TAEG" value={summary.taeg === null ? '—' : formatPercent(summary.taeg)} hint="Sur les flux réels" />
+            <Stat
+              label="TAEG"
+              value={summary.taeg === null ? '—' : formatPercent(summary.taeg)}
+              hint={
+                marketAprc
+                  ? `Moyenne du marché : ${formatPercent(marketAprc[1] / 100)} (${ratesDateLabel(marketAprc[0])})`
+                  : 'Sur les flux réels'
+              }
+            />
             <Stat
               label="Fin du crédit"
               value={formatDate(monthDate(settings.firstPaymentDate, summary.endMonth))}
@@ -142,7 +170,7 @@ function ScenarioEditor({ scenario, settings }: { scenario: Scenario; settings: 
         actions={
           scenario.tranches.length < 6 ? (
             <div className="flex flex-wrap gap-2">
-              <Button onClick={() => update({ tranches: [...scenario.tranches, defaultTranche(settings, 50_000)] })}>
+              <Button onClick={() => update({ tranches: [...scenario.tranches, defaultTranche(settings, bank, 50_000)] })}>
                 Ajouter une tranche
               </Button>
               <Button onClick={() => update({ tranches: [...scenario.tranches, zeroRateTranche()] })}>
@@ -275,10 +303,15 @@ function ScenarioEditor({ scenario, settings }: { scenario: Scenario; settings: 
         )}
       </Card>
 
-      <RefinancingEditor scenario={scenario} settings={settings} errors={errors} onChange={(refinancing) => update({ refinancing })} />
+      <RefinancingEditor
+        scenario={scenario}
+        settings={settings}
+        errors={errors}
+        onChange={(refinancing) => update({ refinancing })}
+      />
 
       {scenario.prepayments.length > 0 && computation.analysis ? (
-        <OpportunityCard scenario={scenario} settings={settings} analysis={computation.analysis} />
+        <OpportunityCard scenario={scenario} settings={settings} banks={banks} analysis={computation.analysis} />
       ) : null}
     </>
   );
@@ -406,16 +439,26 @@ function PrepaymentEditor({
 }
 
 /** « Rembourser anticipativement » ou « investir la différence » ? */
-function OpportunityCard({ scenario, settings, analysis }: { scenario: Scenario; settings: Settings; analysis: ScenarioAnalysis }) {
+function OpportunityCard({
+  scenario,
+  settings,
+  banks,
+  analysis,
+}: {
+  scenario: Scenario;
+  settings: Settings;
+  banks: readonly BankProfile[];
+  analysis: ScenarioAnalysis;
+}) {
   const opportunity = useMemo(() => {
-    const withoutPrepay = computeScenario({ ...scenario, prepayments: [] }, settings).analysis;
+    const withoutPrepay = computeScenario({ ...scenario, prepayments: [] }, { settings, banks: [...banks] }).analysis;
     if (!withoutPrepay) return null;
     return compareOpportunity(
       { result: analysis.result, costs: analysis.costs },
       { result: withoutPrepay.result, costs: withoutPrepay.costs },
       settings.investmentReturn,
     );
-  }, [scenario, settings, analysis]);
+  }, [scenario, settings, banks, analysis]);
   if (!opportunity) return null;
   const prepayWins = opportunity.advantagePrepay >= 0;
   return (

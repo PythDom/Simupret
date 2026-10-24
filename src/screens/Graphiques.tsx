@@ -9,13 +9,13 @@ export default function Graphiques() {
   const { state } = useStore();
   const { settings } = state;
   const scenario = state.scenarios.find((s) => s.id === state.selectedScenarioId);
-  const computation = useScenarioComputation(scenario, settings);
+  const computation = useScenarioComputation(scenario, state);
 
   // Comparaison des coûts : scénarios cochés dans le comparateur, sinon tous.
   const costs = useMemo<CostBar[]>(() => {
     const list = state.compareIds.length >= 2 ? state.scenarios.filter((s) => state.compareIds.includes(s.id)) : state.scenarios;
     return list.flatMap((s) => {
-      const c = computeScenario(s, settings);
+      const c = computeScenario(s, state);
       const m = c.summary;
       return m
         ? [
@@ -29,7 +29,7 @@ export default function Graphiques() {
           ]
         : [];
     });
-  }, [state.scenarios, state.compareIds, settings]);
+  }, [state]);
 
   if (!scenario) return <Notice>Créez d&apos;abord un scénario.</Notice>;
   const result = computation?.result;

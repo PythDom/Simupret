@@ -11,7 +11,7 @@ import { useStore } from '../state/context';
 export default function Amortissement() {
   const { state } = useStore();
   const scenario = state.scenarios.find((s) => s.id === state.selectedScenarioId);
-  const computation = useScenarioComputation(scenario, state.settings);
+  const computation = useScenarioComputation(scenario, state);
   const [view, setView] = useState<string>('all');
   const [granularity, setGranularity] = useState<Granularity>('month');
 

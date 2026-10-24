@@ -25,7 +25,11 @@ export default function APropos() {
             Taux mensuel équivalent : (1 + taux annuel)<sup>1/12</sup> − 1, conformément à la pratique belge.
           </li>
           <li>Les montants ne sont arrondis qu&apos;à l&apos;affichage.</li>
-          <li>Aucune donnée ne quitte votre appareil : pas de compte, pas de serveur.</li>
+          <li>
+            Aucune donnée personnelle ne quitte votre appareil : pas de compte, pas de serveur. Seul le bouton
+            « Mettre à jour » de l&apos;écran Banques interroge le service public de données de la BCE (moyennes de la
+            BNB).
+          </li>
         </ul>
       </section>
       <section className="card space-y-1 text-sm text-slate-600 dark:text-slate-400">

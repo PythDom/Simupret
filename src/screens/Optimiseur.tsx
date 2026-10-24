@@ -1,8 +1,11 @@
-import { useMemo } from 'react';
-import { QUOTITE_TIER_LABELS, optimize, validateOptimizerInput, type OptimizerConfiguration } from '../engine';
+import { useMemo, useState } from 'react';
+import { QUOTITE_TIER_LABELS, type OptimizerConfiguration } from '../engine';
 import { formatDate, formatDuration, formatEuro, formatEuroRounded, formatPercent } from '../format';
+import { SelectField } from '../components/fields';
 import { Button, Card, ErrorList, IndicativeBadge, Notice, Stat } from '../components/ui';
+import { bankById } from '../state/banks';
 import { monthDate } from '../state/derived';
+import { optimizeAcrossBanks, type BankConfiguration } from '../state/optimizeBanks';
 import { configurationToScenario } from '../state/scenarioFactory';
 import { useStore } from '../state/context';
 
@@ -12,31 +15,21 @@ function describeTranches(c: OptimizerConfiguration): string {
     .join(' + ');
 }
 
+const ALL_BANKS = 'toutes';
+
 export default function Optimiseur() {
   const { state, dispatch } = useStore();
   const s = state.settings;
-  const input = useMemo(
-    () => ({
-      amount: s.amount,
-      propertyValue: s.propertyValue,
-      monthlyBudget: s.monthlyBudget,
-      maxDurationMonths: s.maxDurationMonths,
-      minMargin: s.minMargin,
-      maxTranches: s.maxTranches,
-      rateGrid: s.rateGrid,
-      penalty: s.penalty,
-      costs: s.costs,
-    }),
-    [s],
+  const [choice, setChoice] = useState(state.banks.length > 1 ? ALL_BANKS : s.defaultBankId);
+  const banks = useMemo(
+    () => (choice === ALL_BANKS ? state.banks : [bankById(state.banks, choice)]),
+    [choice, state.banks],
   );
-  const errors = useMemo(() => validateOptimizerInput(input), [input]);
-  const result = useMemo(
-    () => (errors.length === 0 ? optimize(input, { rateConvention: s.rateConvention }) : null),
-    [errors, input, s.rateConvention],
-  );
+  const result = useMemo(() => optimizeAcrossBanks(s, banks), [s, banks]);
+  const showBank = banks.length > 1;
 
-  function createScenario(c: OptimizerConfiguration, name: string) {
-    dispatch({ type: 'scenario/add', scenario: configurationToScenario(c, name) });
+  function createScenario(r: BankConfiguration, name: string) {
+    dispatch({ type: 'scenario/add', scenario: configurationToScenario(r.config, name, r.bank.id) });
     window.location.hash = '#/scenarios';
   }
 
@@ -46,11 +39,20 @@ export default function Optimiseur() {
         <p className="text-sm text-slate-600 dark:text-slate-400">
           Recherche des combinaisons de 1 à {s.maxTranches} tranches (durées de la grille, montants par pas de 5 000 €) qui
           minimisent le coût total (intérêts, frais et assurances), avec une mensualité toujours inférieure ou égale à{' '}
-          <strong>{formatEuro(s.monthlyBudget - s.minMargin)}</strong> (budget − marge). Modifiez les paramètres dans
-          l&apos;écran « Paramètres ».
+          <strong>{formatEuro(s.monthlyBudget - s.minMargin)}</strong> (budget − marge). Projet et budget : écran
+          « Paramètres » ; taux et frais : écran « Banques ».
         </p>
-        <ErrorList errors={errors} />
-        {result ? (
+        <SelectField
+          label="Banque"
+          value={choice}
+          options={[
+            ...(state.banks.length > 1 ? [{ value: ALL_BANKS, label: 'Toutes les banques' }] : []),
+            ...state.banks.map((b) => ({ value: b.id, label: b.name })),
+          ]}
+          onChange={setChoice}
+        />
+        {result ? <ErrorList errors={result.errors} /> : null}
+        {result && result.errors.length === 0 ? (
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             <Stat label="Montant" value={formatEuroRounded(s.amount)} />
             <Stat label="Quotité" value={formatPercent(result.quotite, 1)} hint={`Grille ${QUOTITE_TIER_LABELS[result.tier]}`} />
@@ -67,13 +69,14 @@ export default function Optimiseur() {
           <h2 id="top-title" className="text-lg font-semibold">
             Meilleures configurations
           </h2>
-          {result.top.map((c, i) => (
+          {result.top.map((r, i) => (
             <ResultCard
               key={i}
               rank={i + 1}
-              config={c}
+              config={r.config}
+              bankName={showBank ? r.bank.name : undefined}
               firstPaymentDate={s.firstPaymentDate}
-              onCreate={() => createScenario(c, `Optimiseur n° ${i + 1}`)}
+              onCreate={() => createScenario(r, `Optimiseur n° ${i + 1}${showBank ? ` — ${r.bank.name}` : ''}`)}
             />
           ))}
         </section>
@@ -96,7 +99,8 @@ export default function Optimiseur() {
             ) : null}
           </p>
           <ResultCard
-            config={result.flexibility}
+            config={result.flexibility.config}
+            bankName={showBank ? result.flexibility.bank.name : undefined}
             firstPaymentDate={s.firstPaymentDate}
             flexible
             onCreate={() => createScenario(result.flexibility!, 'Flexibilité maximale')}
@@ -110,12 +114,14 @@ export default function Optimiseur() {
 function ResultCard({
   rank,
   config: c,
+  bankName,
   firstPaymentDate,
   flexible,
   onCreate,
 }: {
   rank?: number;
   config: OptimizerConfiguration;
+  bankName?: string;
   firstPaymentDate: string;
   flexible?: boolean;
   onCreate: () => void;
@@ -124,7 +130,10 @@ function ResultCard({
     <article className="card space-y-3">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <h3 className="font-semibold">{rank ? `N° ${rank}` : 'Flexibilité maximale'}</h3>
+          <h3 className="font-semibold">
+            {rank ? `N° ${rank}` : 'Flexibilité maximale'}
+            {bankName ? <span className="font-normal text-slate-600 dark:text-slate-400"> — {bankName}</span> : null}
+          </h3>
           <p className="text-sm text-slate-600 dark:text-slate-400">{describeTranches(c)}</p>
         </div>
         <Button variant="primary" onClick={onCreate}>

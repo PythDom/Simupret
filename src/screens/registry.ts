@@ -1,5 +1,6 @@
 export type ScreenId =
   | 'parametres'
+  | 'banques'
   | 'scenarios'
   | 'comparateur'
   | 'optimiseur'
@@ -15,6 +16,7 @@ export interface ScreenDef {
 
 export const SCREENS: readonly ScreenDef[] = [
   { id: 'parametres', label: 'Paramètres' },
+  { id: 'banques', label: 'Banques' },
   { id: 'scenarios', label: 'Scénarios' },
   { id: 'comparateur', label: 'Comparateur' },
   { id: 'optimiseur', label: 'Optimiseur' },

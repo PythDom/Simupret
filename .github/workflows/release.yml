@@ -82,6 +82,9 @@ jobs:
       - name: Tests
         run: npm test
 
+      - name: Moyennes BNB les plus récentes (copie embarquée)
+        run: node scripts/update-market-snapshot.ts || echo "::warning::Moyennes BNB indisponibles : copie existante conservée."
+
       - name: Build web
         run: npm run build
 
@@ -155,10 +158,14 @@ jobs:
             package-lock.json
             desktop/package-lock.json
 
+      - name: Installer les dépendances
+        run: npm ci
+
+      - name: Moyennes BNB les plus récentes (copie embarquée)
+        run: node scripts/update-market-snapshot.ts || echo "::warning::Moyennes BNB indisponibles : copie existante conservée."
+
       - name: Build web
-        run: |
-          npm ci
-          npm run build
+        run: npm run build
 
       - name: Installer Electron
         working-directory: desktop

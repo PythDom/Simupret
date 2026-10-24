@@ -115,3 +115,15 @@ export function isoToDisplay(iso: string): string {
   const [y, m, d] = iso.split('-');
   return `${d}/${m}/${y}`;
 }
+
+/** Date des taux : « 2026-08 » → « 08/2026 », « 2026-10-12 » → « 12/10/2026 ». */
+export function ratesDateLabel(d: string): string {
+  const [y, m, day] = d.split('-');
+  return day ? `${day}/${m}/${y}` : `${m}/${y}`;
+}
+
+/** « 2026-08 » → « août 2026 ». */
+export function formatMonth(yyyyMm: string): string {
+  const [y, m] = yyyyMm.split('-').map(Number);
+  return new Intl.DateTimeFormat(LOCALE, { month: 'long', year: 'numeric' }).format(new Date(y ?? 2026, (m ?? 1) - 1, 1));
+}
