@@ -83,7 +83,8 @@ jobs:
         run: npm test
 
       - name: Moyennes BNB les plus récentes (copie embarquée)
-        run: node scripts/update-market-snapshot.ts || echo "::warning::Moyennes BNB indisponibles : copie existante conservée."
+        run: |
+          node scripts/update-market-snapshot.ts || echo "::warning::Moyennes BNB indisponibles, copie existante conservée."
 
       - name: Build web
         run: npm run build
@@ -162,7 +163,8 @@ jobs:
         run: npm ci
 
       - name: Moyennes BNB les plus récentes (copie embarquée)
-        run: node scripts/update-market-snapshot.ts || echo "::warning::Moyennes BNB indisponibles : copie existante conservée."
+        run: |
+          node scripts/update-market-snapshot.ts || echo "::warning::Moyennes BNB indisponibles, copie existante conservée."
 
       - name: Build web
         run: npm run build
